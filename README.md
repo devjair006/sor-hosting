@@ -37,6 +37,7 @@ El primer comando solicita la contraseña sin mostrarla. No existe un usuario ni
 Sigue [la instalación](docs/installation.md). La configuración del servidor, dominios, rutas, imágenes por digest y secretos es propia del VPS; no hay valores inventados ni credenciales en el repositorio.
 
 - [Nginx y Certbot dentro de Docker: configuración, pruebas y despliegue manual](docs/docker-edge.md)
+- [Sitios externos y eliminación segura](docs/site-lifecycle.md)
 - [Operación y recuperación](docs/operations.md)
 - [Pruebas y validación](docs/testing.md)
 - [Decisiones de implementación](docs/implementation-notes.md)

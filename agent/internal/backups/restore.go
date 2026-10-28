@@ -46,6 +46,9 @@ func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operati
 	if e != nil || original.Domain != domain {
 		return result, errors.New("domain confirmation mismatch")
 	}
+	if !original.Mutable() {
+		return result, errors.New("read-only site")
+	}
 	if original.Budget.MemoryMB < 256 || original.Budget.MemoryMB > 16384 || original.Budget.CPULimit < .25 || original.Budget.CPULimit > 16 {
 		return result, errors.New("site resource budget must be declared before restoration")
 	}

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sor.hosting/agent/internal/backups"
+	"sor.hosting/agent/internal/deletion"
 	"sor.hosting/agent/internal/docker"
 	"sor.hosting/agent/internal/journal"
 	"sor.hosting/agent/internal/wordpress"
@@ -13,10 +14,11 @@ import (
 )
 
 type Dispatcher struct {
-	Store   *journal.Store
-	Docker  *docker.Manager
-	WP      *wordpress.Manager
-	Backups *backups.Manager
+	Store    *journal.Store
+	Docker   *docker.Manager
+	WP       *wordpress.Manager
+	Backups  *backups.Manager
+	Deletion *deletion.Manager
 }
 
 func (d *Dispatcher) Run(ctx context.Context) error {
@@ -30,6 +32,19 @@ func (d *Dispatcher) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-tick.C:
+			pending, readErr := d.Store.Queued(ctx)
+			if readErr == nil && len(pending) > 0 && pending[0].Kind == "site.external" {
+				recoveries, recoveryErr := d.Store.Q.Recoveries(ctx)
+				if recoveryErr == nil && len(recoveries) == 0 {
+					d.execute(ctx, pending[0])
+					continue
+				}
+			}
+			if d.Deletion != nil {
+				if e := d.Deletion.Recover(ctx); e != nil {
+					continue
+				}
+			}
 			if e := d.WP.Nginx.Recover(ctx); e != nil {
 				continue
 			}
@@ -68,6 +83,10 @@ func (d *Dispatcher) execute(parent context.Context, r agentapi.OperationRequest
 		result = map[string]string{"id": r.ResourceID}
 	case "site.install":
 		result, err = d.WP.Install(ctx, r, checkpoint)
+	case "site.delete":
+		result, err = d.Deletion.Delete(ctx, r)
+	case "site.external":
+		result, err = d.WP.RegisterExternal(ctx, r)
 	case "site.adopt":
 		result, err = d.WP.Adopt(ctx, r)
 	case "domain.configure", "certificate.issue", "certificate.renew":
@@ -127,6 +146,11 @@ func (d *Dispatcher) execute(parent context.Context, r agentapi.OperationRequest
 			phase = "Revisión requerida antes de volver a intentar"
 			code = "RECOVERY_REQUIRED"
 		}
+	}
+	if errors.Is(err, deletion.ErrPending) {
+		state = "running"
+		phase = "Reanudando eliminación segura"
+		code = "DELETE_PENDING"
 	}
 	if err != nil {
 		slog.Warn("operation did not complete", "id", r.ID, "kind", r.Kind, "code", code)

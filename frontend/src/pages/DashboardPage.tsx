@@ -304,10 +304,17 @@ export function DashboardPage() {
                 <TableRow key={s.id}>
                   <TableCell>
                     <Link className="site-name" to={"/sites/" + s.id}>
-                      <span className="site-avatar">
+                      <span className="site-avatar" aria-hidden="true">
                         {s.name[0]?.toUpperCase()}
                       </span>
-                      <strong>{s.name}</strong>
+                      <span>
+                        <strong>{s.name}</strong>
+                        <small className="block muted">
+                          {s.management === "external"
+                            ? "Externo · solo lectura"
+                            : "Administrado por SOR"}
+                        </small>
+                      </span>
                     </Link>
                   </TableCell>
                   <TableCell>

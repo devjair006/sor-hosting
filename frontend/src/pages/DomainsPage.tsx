@@ -178,11 +178,17 @@ export function DomainsPage() {
               <label htmlFor="domain-site">Sitio</label>
               <select id="domain-site" name="site" required>
                 <option value="">Seleccionar sitio</option>
-                {sites.data?.items.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} · {s.domain}
-                  </option>
-                ))}
+                {sites.data?.items
+                  .filter(
+                    (s) =>
+                      s.management !== "external" &&
+                      (!s.lifecycle || s.lifecycle === "present"),
+                  )
+                  .map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} · {s.domain}
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="field">

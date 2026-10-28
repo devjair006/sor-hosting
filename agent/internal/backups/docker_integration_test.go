@@ -219,5 +219,8 @@ func TestDockerWordPressBackupRestore(t *testing.T) {
 	if verifyEdge != nil {
 		verifyEdge(wp, restored)
 	}
+	if os.Getenv("SOR_LIFECYCLE_INTEGRATION") == "1" {
+		testSiteDeletion(t, wp, restored, bm)
+	}
 	t.Log("real Docker install, authorized actions/logs, file+database backup, safety backup and staged restoration passed")
 }

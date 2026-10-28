@@ -235,6 +235,9 @@ func (m *Manager) Install(ctx context.Context, r agentapi.OperationRequest, chec
 		return s, e
 	}
 	for _, v := range all {
+		if !v.Present() {
+			continue
+		}
 		if v.Domain == host || v.ID == r.ResourceID {
 			return s, errors.New("domain or resource ID already managed")
 		}
@@ -320,11 +323,17 @@ func (m *Manager) ConfigureDomain(ctx context.Context, id, siteID, host string, 
 	if e != nil {
 		return d, e
 	}
+	if !s.Mutable() {
+		return d, errors.New("read-only site")
+	}
 	sites, e := m.Store.Sites(ctx)
 	if e != nil {
 		return d, e
 	}
 	for _, other := range sites {
+		if other.ID != s.ID && other.Present() && other.Domain == host {
+			return d, errors.New("domain already registered")
+		}
 		ds, e := m.Store.Domains(ctx, other.ID)
 		if e != nil {
 			return d, e
@@ -395,6 +404,9 @@ func (m *Manager) Adopt(ctx context.Context, r agentapi.OperationRequest) (agent
 	}
 	wanted := append([]string{s.WebID, s.DBID}, s.Writers...)
 	for _, other := range existing {
+		if !other.Present() {
+			continue
+		}
 		if other.Domain == s.Domain || other.ID == r.ResourceID {
 			return agentapi.SiteResources{}, errors.New("domain already adopted")
 		}

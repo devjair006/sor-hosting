@@ -8,7 +8,7 @@ func CertbotArgs(input []string) ([]string, error) {
 	if len(input) == 1 && input[0] == "--version" {
 		return append([]string(nil), input...), nil
 	}
-	if len(input) == 0 || (input[0] != "certonly" && input[0] != "renew") {
+	if len(input) == 0 || (input[0] != "certonly" && input[0] != "renew" && input[0] != "delete") {
 		return nil, errors.New("Certbot command not allowed")
 	}
 	result := []string{input[0]}

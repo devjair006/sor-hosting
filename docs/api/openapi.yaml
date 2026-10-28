@@ -1244,7 +1244,7 @@ paths:
                   lines:
                     type: array
                     items: *id001
-                  truncated: &id004
+                  truncated: &id006
                     type: boolean
                 required:
                 - lines
@@ -1620,6 +1620,153 @@ paths:
                   maxLength: 80
               required:
               - server_name
+  /sites/external:
+    post:
+      summary: Registrar WordPress externo de solo lectura
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: &id003
+          type: string
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id003
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-zA-Z0-9_-]{8,80}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExternalInput'
+      description: Registra metadatos y referencias opcionales mediante inspección.
+        No adopta ni modifica recursos Docker, Nginx o MariaDB.
+  /sites/{id}/delete:
+    post:
+      summary: Eliminar sitio administrado con confirmación exacta
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: &id004
+          type: string
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id004
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-zA-Z0-9_-]{8,80}$
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteInput'
+      description: Operación idempotente; exige dominio completo, verifica propiedad
+        exclusiva y crea backup de seguridad. External y adopciones sin propiedad
+        verificable se rechazan. Tras comenzar el borrado, la recuperación continúa
+        hacia delante.
 components:
   securitySchemes:
     session:
@@ -1658,10 +1805,10 @@ components:
           - interrupted
         phase: *id001
         error_code: *id001
-        created_at: &id003
+        created_at: &id005
           type: string
           format: date-time
-        updated_at: *id003
+        updated_at: *id005
       required:
       - id
       - kind
@@ -1698,8 +1845,23 @@ components:
         availability:
           type: boolean
           nullable: true
-        created_at: *id003
-        updated_at: *id003
+        created_at: *id005
+        updated_at: *id005
+        management:
+          type: string
+          enum:
+          - managed
+          - external
+        lifecycle:
+          type: string
+          enum:
+          - present
+          - deleting
+          - deleted
+        can_delete:
+          type: boolean
+        can_backup:
+          type: boolean
       required:
       - id
       - server_id
@@ -1718,10 +1880,10 @@ components:
         image: *id001
         state: *id001
         status: *id001
-        managed: *id004
-        can_manage: *id004
-        can_read_logs: *id004
-        protected: *id004
+        managed: *id006
+        can_manage: *id006
+        can_read_logs: *id006
+        protected: *id006
         site_id: *id001
         cpu_pct:
           type: number
@@ -1750,7 +1912,7 @@ components:
         hostname: *id001
         dns_state: *id001
         metadata: *id001
-        created_at: *id003
+        created_at: *id005
       required:
       - id
       - site_id
@@ -1786,7 +1948,7 @@ components:
           type: integer
         checksum: *id001
         metadata: *id001
-        created_at: *id003
+        created_at: *id005
       required:
       - id
       - site_id
@@ -1803,7 +1965,7 @@ components:
         action: *id001
         resource_id: *id001
         outcome: *id001
-        created_at: *id003
+        created_at: *id005
       required:
       - id
       - user_id
@@ -1981,7 +2143,7 @@ components:
           items:
             $ref: '#/components/schemas/Series'
         observed_at: *id001
-        stale: *id004
+        stale: *id006
       required:
       - series
       - observed_at
@@ -1997,8 +2159,8 @@ components:
         integrations:
           type: object
           properties:
-            agent: *id004
-            prometheus: *id004
+            agent: *id006
+            prometheus: *id006
           required:
           - agent
           - prometheus
@@ -2042,7 +2204,7 @@ components:
             type: object
             properties:
               name: *id001
-              available: *id004
+              available: *id006
             required:
             - name
             - available
@@ -2140,3 +2302,36 @@ components:
       required:
       - items
       - next_cursor
+    ExternalInput:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - domain
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        domain:
+          type: string
+        web_container_id:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+        database_container_id:
+          type: string
+          pattern: ^[a-f0-9]{64}$
+    DeleteInput:
+      type: object
+      additionalProperties: false
+      required:
+      - confirm_domain
+      - keep_backups
+      properties:
+        confirm_domain:
+          type: string
+          description: Debe coincidir exactamente con el dominio del sitio.
+        keep_backups:
+          type: boolean
+          description: Conserva todos los backups, incluido el backup de seguridad
+            creado para esta eliminación.

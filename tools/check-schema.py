@@ -6,15 +6,15 @@ import unittest
 ROOT=Path(__file__).resolve().parents[1]
 class SchemaTests(unittest.TestCase):
  def setUp(self):
-  self.db=sqlite3.connect(':memory:');self.db.execute('PRAGMA foreign_keys=ON');self.db.executescript((ROOT/'backend/migrations/000001_initial.sql').read_text())
+  self.db=sqlite3.connect(':memory:');self.db.execute('PRAGMA foreign_keys=ON');[self.db.executescript(p.read_text()) for p in sorted((ROOT/'backend/migrations').glob('*.sql'))]
  def tearDown(self): self.db.close()
  def site(self,id='site1',domain='a.example',state='active'):
-  self.db.execute('INSERT INTO sites VALUES(?,?,?,?,?,?,?,?)',(id,'local','Example',domain,state,'{}','now','now'))
+  self.db.execute('INSERT INTO sites(id,server_id,name,domain,state,metadata,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?)',(id,'local','Example',domain,state,'{}','now','now'))
  def test_domain_is_unique_per_server(self):
   self.site()
   with self.assertRaises(sqlite3.IntegrityError):self.site('site2')
  def test_foreign_server_cannot_own_site(self):
-  with self.assertRaises(sqlite3.IntegrityError):self.db.execute("INSERT INTO sites VALUES('s','foreign','X','a.example','active','{}','now','now')")
+  with self.assertRaises(sqlite3.IntegrityError):self.db.execute("INSERT INTO sites(id,server_id,name,domain,state,metadata,created_at,updated_at) VALUES('s','foreign','X','a.example','active','{}','now','now')")
  def test_unknown_site_state_rejected(self):
   with self.assertRaises(sqlite3.IntegrityError):self.site(state='invented')
  def test_pending_ssl_is_distinct_from_pending_dns(self):
@@ -35,7 +35,7 @@ class SchemaTests(unittest.TestCase):
  def test_agent_journal_sources_prepare(self):
   import re
   with sqlite3.connect(':memory:') as db:
-   db.executescript((ROOT/'agent/migrations/000001_agent.sql').read_text())
+   [db.executescript(p.read_text()) for p in sorted((ROOT/'agent/migrations').glob('*.sql'))]
    for query in re.split(r'-- name: [^\n]+\n',(ROOT/'agent/queries/journal.sql').read_text())[1:]:
     query=query.strip();db.execute('EXPLAIN '+query,[None]*query.count('?')).fetchall()
  def test_container_has_one_association(self):

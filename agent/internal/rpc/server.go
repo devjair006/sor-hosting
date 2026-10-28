@@ -73,7 +73,7 @@ func Server(cfg config.Config, d *operations.Dispatcher) (*http.Server, net.List
 		certReady := d.WP.Certbot.Available(ctx)
 		recoveries, recoveryErr := d.Store.Q.Recoveries(ctx)
 		markers, markerErr := filepath.Glob(filepath.Join(cfg.NginxDir, ".sor-*.rollback"))
-		response(w, 200, agentapi.Status{InstallReady: d.WP.TemplateReady() && nginxReady, Connected: true, Docker: e == nil, Nginx: nginxReady, Certbot: certReady, RecoveryRequired: recoveryErr != nil || len(recoveries) > 0 || markerErr != nil || len(markers) > 0, Version: "0.2.0"})
+		response(w, 200, agentapi.Status{SiteLifecycle: true, InstallReady: d.WP.TemplateReady() && nginxReady, Connected: true, Docker: e == nil, Nginx: nginxReady, Certbot: certReady, RecoveryRequired: recoveryErr != nil || len(recoveries) > 0 || markerErr != nil || len(markers) > 0, Version: "0.3.0"})
 	})
 	mux.HandleFunc("GET /containers", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
