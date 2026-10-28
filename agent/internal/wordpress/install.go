@@ -67,6 +67,9 @@ func (m *Manager) Compose(ctx context.Context, ref string, args []string, in io.
 	return m.Runner.Run(ctx, "docker", append(base, args...), in, out)
 }
 func (m *Manager) Prepare(ctx context.Context, siteID, ref, secretRef string, in agentapi.SiteInput) (agentapi.SiteResources, error) {
+	if e := m.CheckProxy(ctx); e != nil {
+		return agentapi.SiteResources{}, e
+	}
 	s := agentapi.SiteResources{Budget: in.Resources, ID: siteID, Name: in.Name, Domain: in.Domain, SecretRef: secretRef, State: "provisioning", Network: "sor_" + ref + "_network", WebVolume: "sor_" + ref + "_wp", DBVolume: "sor_" + ref + "_db"}
 	if !agentapi.OpaqueID.MatchString(siteID) || !agentapi.OpaqueID.MatchString(ref) || !agentapi.OpaqueID.MatchString(secretRef) {
 		return s, errors.New("invalid site ID")
@@ -224,6 +227,9 @@ func (m *Manager) Install(ctx context.Context, r agentapi.OperationRequest, chec
 		return s, e
 	}
 	in.Domain = host
+	if e = m.CheckProxy(ctx); e != nil {
+		return s, e
+	}
 	all, e := m.Store.Sites(ctx)
 	if e != nil {
 		return s, e

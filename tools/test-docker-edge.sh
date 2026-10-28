@@ -13,4 +13,5 @@ done
 export SOR_EDGE_INTEGRATION=1
 export SOR_TEST_NGINX_IMAGE="${digests[0]}"
 export SOR_TEST_CERTBOT_IMAGE="${digests[1]}"
+(cd agent && go test -tags=integration ./internal/dockerexec -count=1 -v)
 bash tools/test-docker.sh

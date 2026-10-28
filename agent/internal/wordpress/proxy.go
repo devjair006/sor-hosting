@@ -45,3 +45,10 @@ func (m *Manager) ApplyProxy(ctx context.Context, host string, s agentapi.SiteRe
 	}
 	return m.Nginx.ApplyDNS(ctx, host, alias, cert)
 }
+
+func (m *Manager) CheckProxy(ctx context.Context) error {
+	if m.Nginx != nil && m.Nginx.Check != nil {
+		return m.Nginx.Check(ctx)
+	}
+	return nil
+}

@@ -73,6 +73,10 @@ func (c *Client) Issue(ctx context.Context, id, host string, renew bool) (*agent
 	if c.Server != "" {
 		args = append(args, "--server", c.Server)
 	}
+	args, e = executil.CertbotArgs(args)
+	if e != nil {
+		return nil, e
+	}
 	runner := c.Runner
 	if runner == nil {
 		runner = executil.Runner{}

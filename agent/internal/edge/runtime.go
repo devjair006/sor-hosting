@@ -14,14 +14,30 @@ import (
 func New(cfg config.Config, api *client.Client, store *journal.Store) (*nginx.Manager, *certbot.Client) {
 	proxy := &nginx.Manager{Dir: cfg.NginxDir, Webroot: cfg.ACMEWebroot, ContainerDir: cfg.Nginx.IncludeDir, ContainerWebroot: cfg.Nginx.Webroot, CertificatesDir: cfg.Nginx.CertificatesDir, ProtectedDomains: cfg.ProtectedDomains}
 	certs := &certbot.Client{Directory: cfg.Certbot.Directory, Webroot: cfg.ACMEWebroot, Email: cfg.CertbotEmail, PublicIPs: cfg.PublicIPs, ProtectedDomains: cfg.ProtectedDomains, Server: cfg.Certbot.Server, ExecutionDirectory: cfg.Certbot.Directory}
+	sharedCheck := func() error {
+		if cfg.Nginx.Mode != "docker" && cfg.Certbot.Mode != "docker" {
+			return nil
+		}
+		if e := requireAliasMount(cfg.Certbot.ConfigSource, cfg.Certbot.Directory); e != nil {
+			return e
+		}
+		return requireAliasMountMode(cfg.Certbot.WebrootSource, cfg.ACMEWebroot, false)
+	}
+	proxy.Check = func(context.Context) error { return sharedCheck() }
 	if cfg.Nginx.Mode == "docker" {
 		runtime := &dockerexec.Nginx{API: api, Container: cfg.Nginx.Container, Network: cfg.Nginx.ProxyNetwork, Mounts: []dockerexec.Bind{{Source: cfg.NginxDir, Target: cfg.Nginx.IncludeDir}, {Source: cfg.Certbot.ConfigSource, Target: cfg.Nginx.CertificatesDir}, {Source: cfg.Certbot.WebrootSource, Target: cfg.Nginx.Webroot}}}
 		proxy.Runner = runtime
-		proxy.Health = runtime.Alive
-		proxy.Check = func(ctx context.Context) error { _, e := runtime.Inspect(ctx); return e }
+		proxy.Check = func(ctx context.Context) error {
+			if e := sharedCheck(); e != nil {
+				return e
+			}
+			_, e := runtime.Inspect(ctx)
+			return e
+		}
+		proxy.Health = func(ctx context.Context) bool { return proxy.Check(ctx) == nil }
 	}
 	if cfg.Certbot.Mode == "docker" {
-		certs.Check = func() error { return requireAliasMount(cfg.Certbot.ConfigSource, cfg.Certbot.Directory) }
+		certs.Check = sharedCheck
 		certs.Runner = &dockerexec.Certbot{API: api, Image: cfg.Certbot.Image, ConfigSource: cfg.Certbot.ConfigSource, WebrootSource: cfg.Certbot.WebrootSource}
 		certs.ContainerWebroot = "/var/www/certbot"
 		certs.ExecutionDirectory = "/etc/letsencrypt"

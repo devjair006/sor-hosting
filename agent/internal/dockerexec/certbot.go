@@ -6,12 +6,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
-	"strings"
 	"time"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/mount"
 	"github.com/moby/moby/client"
+	"sor.hosting/agent/internal/executil"
 )
 
 type Certbot struct {
@@ -27,10 +27,9 @@ func (c *Certbot) Run(ctx context.Context, name string, args []string, in io.Rea
 	if name != "certbot" || in != nil || len(args) == 0 || (args[0] != "certonly" && args[0] != "renew" && args[0] != "--version") {
 		return errors.New("Certbot command not allowed")
 	}
-	for _, v := range args {
-		if strings.Contains(v, "hook") && v != "--no-directory-hooks" {
-			return errors.New("Certbot hooks not allowed")
-		}
+	args, err = executil.CertbotArgs(args)
+	if err != nil {
+		return err
 	}
 	if !c.Available(ctx) {
 		return errors.New("pinned Certbot image unavailable; pull it manually")

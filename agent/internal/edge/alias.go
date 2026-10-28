@@ -24,6 +24,9 @@ func mounts(raw string) []mountInfo {
 	return result
 }
 func requireAliasMount(source, target string) error {
+	return requireAliasMountMode(source, target, true)
+}
+func requireAliasMountMode(source, target string, readonly bool) error {
 	if source == target {
 		return nil
 	}
@@ -35,9 +38,12 @@ func requireAliasMount(source, target string) error {
 	if e != nil {
 		return e
 	}
-	return checkAliasMount(source, target, string(self), string(host))
+	return checkAliasMountMode(source, target, string(self), string(host), readonly)
 }
 func checkAliasMount(source, target, self, host string) error {
+	return checkAliasMountMode(source, target, self, host, true)
+}
+func checkAliasMountMode(source, target, self, host string, readonly bool) error {
 	var parent mountInfo
 	for _, m := range mounts(host) {
 		if (m.point == "/" || source == m.point || strings.HasPrefix(source, m.point+"/")) && len(m.point) > len(parent.point) {
@@ -53,7 +59,7 @@ func checkAliasMount(source, target, self, host string) error {
 	}
 	want := filepath.Join(parent.root, rel)
 	for _, m := range mounts(self) {
-		if m.point == target && m.ro && m.device == parent.device && m.root == want {
+		if m.point == target && (!readonly || m.ro) && m.device == parent.device && m.root == want {
 			return nil
 		}
 	}
