@@ -125,6 +125,15 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 			if site.Domain == in.Domain {
 				return Job{}, ErrConflict
 			}
+			domains, e := q.ListDomains(ctx)
+			if e != nil {
+				return Job{}, e
+			}
+			for _, domain := range domains {
+				if domain.SiteID == site.ID && domain.Hostname == in.Domain {
+					return Job{}, ErrConflict
+				}
+			}
 		}
 	}
 	if r.Kind == "domain.configure" {
@@ -138,6 +147,15 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 		}
 		for _, domain := range domains {
 			if domain.Hostname == in.Hostname && domain.ID != r.ResourceID {
+				return Job{}, ErrConflict
+			}
+		}
+		sites, e := q.ListSites(ctx)
+		if e != nil {
+			return Job{}, e
+		}
+		for _, site := range sites {
+			if site.ID != in.SiteID && site.Domain == in.Hostname {
 				return Job{}, ErrConflict
 			}
 		}

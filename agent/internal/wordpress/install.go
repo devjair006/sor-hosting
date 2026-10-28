@@ -331,6 +331,9 @@ func (m *Manager) ConfigureDomain(ctx context.Context, id, siteID, host string, 
 		return d, e
 	}
 	for _, other := range sites {
+		if other.ID != s.ID && other.Present() && other.Domain == host {
+			return d, errors.New("domain already registered")
+		}
 		ds, e := m.Store.Domains(ctx, other.ID)
 		if e != nil {
 			return d, e

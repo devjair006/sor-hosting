@@ -27,6 +27,15 @@ func (m *Manager) RegisterExternal(ctx context.Context, r agentapi.OperationRequ
 		if s.Present() && (s.ID == r.ResourceID || s.Domain == host) {
 			return agentapi.SiteResources{}, errors.New("site already registered")
 		}
+		domains, err := m.Store.Domains(ctx, s.ID)
+		if err != nil {
+			return agentapi.SiteResources{}, err
+		}
+		for _, domain := range domains {
+			if domain.Hostname == host {
+				return agentapi.SiteResources{}, errors.New("domain already registered")
+			}
+		}
 	}
 	for _, id := range []string{in.WebContainerID, in.DatabaseContainerID} {
 		if id == "" {

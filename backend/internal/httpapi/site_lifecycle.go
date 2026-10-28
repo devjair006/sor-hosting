@@ -29,10 +29,18 @@ func (a *App) registerExternal(w http.ResponseWriter, r *http.Request) {
 	a.enqueue(w, r, "site.external", "", in)
 }
 func (a *App) deleteSite(w http.ResponseWriter, r *http.Request) {
-	var in agentapi.DeleteInput
-	if !httpx.Decode(w, r, &in) {
+	var request struct {
+		ConfirmDomain *string `json:"confirm_domain"`
+		KeepBackups   *bool   `json:"keep_backups"`
+	}
+	if !httpx.Decode(w, r, &request) {
 		return
 	}
+	if request.ConfirmDomain == nil || request.KeepBackups == nil {
+		invalid(w, r)
+		return
+	}
+	in := agentapi.DeleteInput{ConfirmDomain: *request.ConfirmDomain, KeepBackups: *request.KeepBackups}
 	id := chi.URLParam(r, "id")
 	if a.recoverJob(w, r, "site.delete", id, in) {
 		return

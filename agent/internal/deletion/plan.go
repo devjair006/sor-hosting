@@ -76,6 +76,9 @@ func (m *Manager) preflight(ctx context.Context, s agentapi.SiteResources) (Plan
 		if other.ID == s.ID || !other.Present() {
 			continue
 		}
+		if other.Domain == s.Domain {
+			return p, reject()
+		}
 		for _, id := range append([]string{other.WebID, other.DBID}, other.Writers...) {
 			if id != "" && selected[id] {
 				return p, reject()
@@ -198,6 +201,11 @@ func (m *Manager) preflight(ctx context.Context, s agentapi.SiteResources) (Plan
 				if a.Hostname == b.Hostname || a.Certificate != nil && b.Certificate != nil && a.Certificate.CertName == b.Certificate.CertName {
 					return p, reject()
 				}
+			}
+		}
+		for _, d := range p.Domains {
+			if d.Hostname == other.Domain {
+				return p, reject()
 			}
 		}
 	}
