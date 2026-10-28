@@ -131,7 +131,7 @@ func testSiteDeletion(t *testing.T, wp *wordpress.Manager, site agentapi.SiteRes
 		proxy.ServeHTTP(w, r)
 	}))
 	defer srv.Close()
-	api, e := client.New(client.WithHost(srv.URL), client.WithAPIVersion("1.56"))
+	api, e := client.New(client.WithHost(srv.URL), client.WithAPIVersion("1.48"))
 	if e != nil {
 		t.Fatal(e)
 	}
