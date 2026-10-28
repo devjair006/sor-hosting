@@ -1,0 +1,11 @@
+version: '2'
+sql:
+  - engine: sqlite
+    queries: queries
+    schema: migrations/000001_agent.sql
+    gen:
+      go:
+        package: sqlc
+        out: internal/journal/sqlc
+        sql_package: database/sql
+        emit_empty_slices: true

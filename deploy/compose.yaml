@@ -1,0 +1,42 @@
+name: sor-hosting
+services:
+  panel:
+    image: ${SOR_IMAGE:-sor-hosting:local}
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: panel
+    user: "10001:10001"
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    pids_limit: 128
+    mem_limit: 512m
+    cpus: 1
+    ports:
+      - "127.0.0.1:${SOR_PANEL_PORT:-8080}:8080"
+    environment:
+      SOR_MODE: production
+      SOR_ORIGIN: ${SOR_ORIGIN:?Define the HTTPS panel origin}
+      SOR_SECRET_KEY: ${SOR_SECRET_KEY:?Define a base64 32-byte key}
+      SOR_ADDRESS: 0.0.0.0:8080
+      SOR_DATABASE: /data/panel.db
+      SOR_STATIC_DIR: /app/frontend
+      SOR_AGENT_SOCKET: /run/sor-hosting/agent.sock
+      SOR_PROMETHEUS_URL: ${SOR_PROMETHEUS_URL:-}
+      SOR_PROMETHEUS_INSTANCE: ${SOR_PROMETHEUS_INSTANCE:-}
+      SOR_FILESYSTEM: ${SOR_FILESYSTEM:-/}
+    volumes:
+      - ${SOR_DATA_DIR:-/var/lib/sor-hosting/panel}:/data
+      - /run/sor-hosting:/run/sor-hosting:ro
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    labels:
+      sor.hosting/infra: "true"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

@@ -1,0 +1,24 @@
+[Unit]
+Description=SOR Hosting local agent
+After=network-online.target docker.service nginx.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+UMask=0077
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/snap/bin:/opt/certbot/bin
+ExecStart=/usr/local/sbin/sor-hosting-agent --config /etc/sor-hosting/agent.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=150
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target

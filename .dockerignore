@@ -1,0 +1,13 @@
+.git
+.superpowers
+.tools
+**/node_modules
+**/dist
+**/internal/database/sqlc
+**/internal/journal/sqlc
+**/*.db*
+**/*.sqlite*
+**/.env
+**/.env.*
+!**/.env.example
+bin

@@ -1,0 +1,2142 @@
+openapi: 3.0.3
+info:
+  title: SOR Hosting API
+  version: 0.1.0
+  description: API privada. Cookies de sesión y CSRF; agente local separado. La configuración
+    sensible no se edita por navegador.
+servers:
+- url: /api/v1
+security:
+- session: []
+paths:
+  /auth/login:
+    post:
+      summary: Iniciar sesión
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                - user
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      security: []
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: &id001
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+  /auth/me:
+    get:
+      summary: Consultar sesión
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                required:
+                - user
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /auth/csrf:
+    get:
+      summary: Obtener token CSRF
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  csrf_token: *id001
+                required:
+                - csrf_token
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /auth/logout:
+    post:
+      summary: Invalidar sesión
+      responses:
+        '204':
+          description: Respuesta correcta
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+  /auth/password:
+    post:
+      summary: Cambiar contraseña e invalidar sesiones
+      responses:
+        '204':
+          description: Respuesta correcta
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordInput'
+  /sites:
+    get:
+      summary: Listar Site
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SitePage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+    post:
+      summary: Instalar WordPress
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: &id002
+          type: string
+          pattern: ^[a-zA-Z0-9_-]{8,80}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InstallInput'
+  /containers:
+    get:
+      summary: Listar Container
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContainerPage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+  /domains:
+    get:
+      summary: Listar Domain
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainPage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+    post:
+      summary: Agregar dominio
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DomainInput'
+  /certificates:
+    get:
+      summary: Listar Certificate
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CertificatePage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+  /backups:
+    get:
+      summary: Listar Backup
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupPage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+  /audit:
+    get:
+      summary: Listar AuditEvent
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEventPage'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: cursor
+        in: query
+        schema: *id001
+  /sites/{id}:
+    get:
+      summary: Detalle de sitio
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  site:
+                    $ref: '#/components/schemas/Site'
+                  containers:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Container'
+                  domains:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Domain'
+                  backups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Backup'
+                required:
+                - site
+                - containers
+                - domains
+                - backups
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+  /sites/adopt:
+    post:
+      summary: Adoptar sitio aprobado localmente
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdoptInput'
+  /containers/{id}/actions:
+    post:
+      summary: Operar contenedor autorizado
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContainerInput'
+  /domains/{id}/check:
+    post:
+      summary: Comprobar DNS y configurar SSL
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+  /certificates/{id}/renew:
+    post:
+      summary: Renovar certificado registrado
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+  /sites/{id}/backups:
+    post:
+      summary: Respaldar sitio
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BackupInput'
+  /backups/{id}/restore:
+    post:
+      summary: Restaurar mediante staging
+      responses:
+        '202':
+          description: Operación registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        schema: *id002
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RestoreInput'
+  /containers/{id}/logs:
+    get:
+      summary: Leer logs autorizados
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lines:
+                    type: array
+                    items: *id001
+                  truncated: &id004
+                    type: boolean
+                required:
+                - lines
+                - truncated
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+      - name: tail
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 200
+  /backups/{id}/download:
+    get:
+      summary: Descargar backup privado
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/gzip:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+  /jobs/{id}:
+    get:
+      summary: Consultar trabajo durable
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResponse'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema: *id002
+  /dashboard:
+    get:
+      summary: Resumen del servidor
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+  /monitoring:
+    get:
+      summary: Series de Prometheus
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monitoring'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: range
+        in: query
+        required: true
+        schema:
+          type: string
+          enum:
+          - 1h
+          - 6h
+          - 24h
+  /settings:
+    get:
+      summary: Configuración operativa
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Settings'
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+    patch:
+      summary: Cambiar nombre del servidor
+      responses:
+        '200':
+          description: Respuesta correcta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  server:
+                    type: object
+                required:
+                - server
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '403':
+          description: Solicitud o recurso no autorizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '404':
+          description: No encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '409':
+          description: Conflicto o recurso ocupado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '422':
+          description: Validación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+        '503':
+          description: Integración no disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APIError'
+      parameters:
+      - name: Origin
+        in: header
+        required: true
+        schema: *id001
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        schema: *id001
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                server_name:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+              required:
+              - server_name
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: __Host-sor_session
+  schemas:
+    User:
+      type: object
+      properties:
+        id: *id002
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+          - admin
+      required:
+      - id
+      - email
+      - role
+    Job:
+      type: object
+      properties:
+        id: *id002
+        kind: *id001
+        resource_id: *id001
+        state:
+          type: string
+          enum:
+          - queued
+          - running
+          - succeeded
+          - failed
+          - interrupted
+        phase: *id001
+        error_code: *id001
+        created_at: &id003
+          type: string
+          format: date-time
+        updated_at: *id003
+      required:
+      - id
+      - kind
+      - resource_id
+      - state
+      - phase
+      - error_code
+      - created_at
+      - updated_at
+    JobResponse:
+      type: object
+      properties:
+        job:
+          $ref: '#/components/schemas/Job'
+      required:
+      - job
+    Site:
+      type: object
+      properties:
+        id: *id002
+        server_id: *id001
+        name: *id001
+        domain: *id001
+        state:
+          type: string
+          enum:
+          - provisioning
+          - pending_dns
+          - pending_ssl
+          - active
+          - failed
+          - restoring
+        metadata: *id001
+        availability:
+          type: boolean
+          nullable: true
+        created_at: *id003
+        updated_at: *id003
+      required:
+      - id
+      - server_id
+      - name
+      - domain
+      - state
+      - metadata
+      - availability
+      - created_at
+      - updated_at
+    Container:
+      type: object
+      properties:
+        id: *id002
+        name: *id001
+        image: *id001
+        state: *id001
+        status: *id001
+        managed: *id004
+        can_manage: *id004
+        can_read_logs: *id004
+        protected: *id004
+        site_id: *id001
+        cpu_pct:
+          type: number
+          nullable: true
+        memory_bytes:
+          type: number
+          nullable: true
+      required:
+      - id
+      - name
+      - image
+      - state
+      - status
+      - managed
+      - can_manage
+      - can_read_logs
+      - protected
+      - site_id
+      - cpu_pct
+      - memory_bytes
+    Domain:
+      type: object
+      properties:
+        id: *id002
+        site_id: *id002
+        hostname: *id001
+        dns_state: *id001
+        metadata: *id001
+        created_at: *id003
+      required:
+      - id
+      - site_id
+      - hostname
+      - dns_state
+      - metadata
+      - created_at
+    Certificate:
+      type: object
+      properties:
+        id: *id002
+        domain_id: *id002
+        cert_name: *id001
+        expires_at: *id001
+        metadata: *id001
+      required:
+      - id
+      - domain_id
+      - cert_name
+      - expires_at
+      - metadata
+    Backup:
+      type: object
+      properties:
+        id: *id002
+        site_id: *id002
+        state:
+          type: string
+          enum:
+          - ready
+          - failed
+        size_bytes:
+          type: integer
+        checksum: *id001
+        metadata: *id001
+        created_at: *id003
+      required:
+      - id
+      - site_id
+      - state
+      - size_bytes
+      - checksum
+      - metadata
+      - created_at
+    AuditEvent:
+      type: object
+      properties:
+        id: *id002
+        user_id: *id001
+        action: *id001
+        resource_id: *id001
+        outcome: *id001
+        created_at: *id003
+      required:
+      - id
+      - user_id
+      - action
+      - resource_id
+      - outcome
+      - created_at
+    APIError:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: *id001
+            message: *id001
+            request_id: *id001
+          required:
+          - code
+          - message
+          - request_id
+      required:
+      - error
+    LoginInput:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+          maxLength: 128
+      required:
+      - email
+      - password
+    PasswordInput:
+      type: object
+      properties:
+        current_password:
+          type: string
+          format: password
+        new_password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+      required:
+      - current_password
+      - new_password
+    InstallInput:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        domain: *id001
+        admin_email:
+          type: string
+          format: email
+        admin_password:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 128
+        wordpress_title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        resources:
+          type: object
+          properties:
+            memory_mb:
+              type: integer
+              minimum: 256
+              maximum: 16384
+            cpu_limit:
+              type: number
+              minimum: 0.25
+              maximum: 16
+          required:
+          - memory_mb
+          - cpu_limit
+      required:
+      - name
+      - domain
+      - admin_email
+      - admin_password
+      - wordpress_title
+      - resources
+    AdoptInput:
+      type: object
+      properties:
+        name: *id001
+        domain: *id001
+        web_container_id: *id002
+        database_container_id: *id002
+        writer_container_ids:
+          type: array
+          items: *id002
+        database_secret_ref: *id002
+      required:
+      - name
+      - domain
+      - web_container_id
+      - database_container_id
+      - writer_container_ids
+      - database_secret_ref
+    DomainInput:
+      type: object
+      properties:
+        site_id: *id002
+        hostname: *id001
+      required:
+      - site_id
+      - hostname
+    ContainerInput:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - start
+          - stop
+          - restart
+      required:
+      - action
+    BackupInput:
+      type: object
+      properties:
+        confirm_maintenance:
+          type: boolean
+          enum:
+          - true
+      required:
+      - confirm_maintenance
+    RestoreInput:
+      type: object
+      properties:
+        confirm_domain: *id001
+        confirm_maintenance:
+          type: boolean
+          enum:
+          - true
+      required:
+      - confirm_domain
+      - confirm_maintenance
+    Series:
+      type: object
+      properties:
+        name: *id001
+        unit: *id001
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              timestamp:
+                type: number
+              value:
+                type: number
+                nullable: true
+            required:
+            - timestamp
+            - value
+      required:
+      - name
+      - unit
+      - points
+    Monitoring:
+      type: object
+      properties:
+        series:
+          type: array
+          items:
+            $ref: '#/components/schemas/Series'
+        observed_at: *id001
+        stale: *id004
+      required:
+      - series
+      - observed_at
+      - stale
+    Settings:
+      type: object
+      properties:
+        server:
+          type: object
+          properties:
+            id: *id001
+            name: *id001
+        integrations:
+          type: object
+          properties:
+            agent: *id004
+            prometheus: *id004
+          required:
+          - agent
+          - prometheus
+        backup_destination: *id001
+      required:
+      - server
+      - integrations
+      - backup_destination
+    Dashboard:
+      type: object
+      properties:
+        server:
+          type: object
+        metrics:
+          type: object
+          properties:
+            cpu:
+              type: number
+              nullable: true
+            memory_pct:
+              type: number
+              nullable: true
+            memory_used:
+              type: number
+              nullable: true
+            memory_total:
+              type: number
+              nullable: true
+            disk_used:
+              type: number
+              nullable: true
+            disk_total:
+              type: number
+              nullable: true
+            traffic:
+              type: number
+              nullable: true
+        services:
+          type: array
+          items:
+            type: object
+            properties:
+              name: *id001
+              available: *id004
+            required:
+            - name
+            - available
+        sites:
+          type: array
+          items:
+            $ref: '#/components/schemas/Site'
+        recent_activity:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        observed_at: *id001
+      required:
+      - server
+      - metrics
+      - services
+      - sites
+      - recent_activity
+      - observed_at
+    SitePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Site'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor
+    ContainerPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Container'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor
+    DomainPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor
+    CertificatePage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Certificate'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor
+    BackupPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Backup'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor
+    AuditEventPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        next_cursor:
+          type: string
+          nullable: true
+      required:
+      - items
+      - next_cursor

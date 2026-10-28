@@ -236,7 +236,7 @@ El agente conserva un inventario local autorizado y un journal SQLite independie
 - Se conserva el mismo `agentapi.Client`, tipos compartidos e IDs entre API, worker y agente; frontend consume OpenAPI y types.ts. Los cambios de contrato actualizan ambos en la misma tarea.
 - Los únicos datos externos necesarios para producción son configuración de VPS, dominios/DNS, Prometheus, paths autorizados, secrets GHCR/SSH y aprobación del despliegue. No impiden implementar ni probar localmente los adaptadores.
 - Entorno observado al planificar: Node/npm disponibles; Go/sqlc no detectados en PATH ni rutas estándar revisadas; Docker CLI disponible pero daemon denegado. La tarea 1 prepara toolchain local cuando sea posible. Pruebas del host y contenedores reales requieren un entorno con acceso y se informan con precisión.
-- Estado actual: diseño aprobado; este plan pendiente de revisión del usuario. No hay backend, agente ni frontend implementados todavía.
+- Estado actual: diseño y ejecución aprobados por el usuario. Código de backend, agente y frontend implementado; la validación Go/Docker/E2E sigue pendiente por restricciones del entorno. Véase docs/testing.md.
 
 ## Revisión y elección de ejecución
 

@@ -1,0 +1,14 @@
+CREATE TABLE users (id TEXT NOT NULL PRIMARY KEY, email TEXT NOT NULL UNIQUE COLLATE NOCASE, password_hash TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'admin' CHECK(role='admin'), created_at TEXT NOT NULL);
+CREATE TABLE sessions (token_hash TEXT NOT NULL PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at INTEGER NOT NULL, last_seen_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE TABLE servers(id TEXT NOT NULL PRIMARY KEY,name TEXT NOT NULL,address TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL);
+INSERT INTO servers VALUES('local','VPS principal','','2026-10-27T00:00:00Z');
+CREATE TABLE sites(id TEXT NOT NULL PRIMARY KEY,server_id TEXT NOT NULL REFERENCES servers(id),name TEXT NOT NULL,domain TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('provisioning','pending_dns','pending_ssl','active','failed','restoring')),metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(server_id,domain));
+CREATE TABLE site_containers(site_id TEXT NOT NULL REFERENCES sites(id),container_id TEXT NOT NULL UNIQUE,role TEXT NOT NULL,PRIMARY KEY(site_id,container_id));
+CREATE TABLE domains(id TEXT NOT NULL PRIMARY KEY,site_id TEXT NOT NULL REFERENCES sites(id),hostname TEXT NOT NULL UNIQUE,dns_state TEXT NOT NULL DEFAULT 'unknown',metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL);
+CREATE TABLE certificates(id TEXT NOT NULL PRIMARY KEY,domain_id TEXT NOT NULL REFERENCES domains(id),cert_name TEXT NOT NULL UNIQUE,expires_at TEXT NOT NULL DEFAULT '',metadata TEXT NOT NULL DEFAULT '{}');
+CREATE TABLE backups(id TEXT NOT NULL PRIMARY KEY,site_id TEXT NOT NULL REFERENCES sites(id),state TEXT NOT NULL CHECK(state IN ('ready','failed')),size_bytes INTEGER NOT NULL DEFAULT 0,checksum TEXT NOT NULL,metadata TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL);
+CREATE TABLE jobs(id TEXT NOT NULL PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),kind TEXT NOT NULL,resource_id TEXT NOT NULL,state TEXT NOT NULL CHECK(state IN ('queued','running','succeeded','failed','interrupted')),phase TEXT NOT NULL DEFAULT '',payload TEXT NOT NULL,idem_key TEXT NOT NULL,digest TEXT NOT NULL,result TEXT NOT NULL DEFAULT '{}',error_code TEXT NOT NULL DEFAULT '',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(user_id,idem_key));
+CREATE TABLE audit_events(id TEXT NOT NULL PRIMARY KEY,user_id TEXT NOT NULL,action TEXT NOT NULL,resource_id TEXT NOT NULL,outcome TEXT NOT NULL,created_at TEXT NOT NULL);
+CREATE INDEX jobs_pending ON jobs(state,created_at);
+CREATE INDEX audit_time ON audit_events(created_at DESC,id DESC);
+CREATE INDEX sessions_expiry ON sessions(expires_at);

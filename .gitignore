@@ -16,3 +16,6 @@ test-results/
 backend/internal/database/sqlc/
 agent/internal/journal/sqlc/
 bin/
+
+*.tsbuildinfo
+__pycache__/

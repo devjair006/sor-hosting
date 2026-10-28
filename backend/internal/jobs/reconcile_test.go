@@ -1,0 +1,52 @@
+package jobs
+import("context";
+"encoding/json";
+"path/filepath";
+"testing";
+"sor.hosting/backend/internal/database";
+"sor.hosting/backend/internal/database/sqlc";
+"sor.hosting/shared/agentapi")
+func fixture(t *testing.T,kind string)(*Service,sqlc.Job){t.Helper();
+ctx:=context.Background();
+db,e:=database.Open(ctx,filepath.Join(t.TempDir(),"panel.db"));
+if e!=nil{t.Fatal(e)};
+t.Cleanup(func(){db.Close()});
+if e=database.Migrate(ctx,db);
+e!=nil{t.Fatal(e)};
+q:=sqlc.New(db);
+if e=q.CreateUser(ctx,sqlc.CreateUserParams{ID:"user123456",Email:"admin@example.com",PasswordHash:"fixture",Role:"admin",CreatedAt:"now"});
+e!=nil{t.Fatal(e)};
+if e=q.CreateJob(ctx,sqlc.CreateJobParams{ID:"job123456",UserID:"user123456",Kind:kind,ResourceID:"site123456",State:"running",Phase:"pending",Payload:"encrypted",IdemKey:"key123456",Digest:"digest",Result:"{}",CreatedAt:"now",UpdatedAt:"now"});
+e!=nil{t.Fatal(e)};
+job,e:=q.Job(ctx,"job123456");
+if e!=nil{t.Fatal(e)};
+return &Service{DB:db,Q:q},job}
+func TestFailedAdoptionDoesNotCreateSite(t *testing.T){s,j:=fixture(t,"site.adopt");
+data,_:=json.Marshal(agentapi.SiteResources{ID:"site123456",Name:"Rejected",Domain:"a.example",State:"active"});
+s.finish(context.Background(),j,agentapi.Operation{State:"failed",Phase:"Rejected",ErrorCode:"OPERATION_FAILED",Result:data});
+sites,e:=s.Q.ListSites(context.Background());
+if e!=nil||len(sites)!=0{t.Fatalf("rejected adoption was persisted: %v %v",sites,e)};
+got,e:=s.Q.Job(context.Background(),j.ID);
+if e!=nil||got.State!="failed"{t.Fatal("job did not reach failed state")}}
+func TestPersistenceConflictDoesNotLeaveJobRunning(t *testing.T){s,j:=fixture(t,"site.adopt");
+ctx:=context.Background();
+e:=s.Q.CreateSite(ctx,sqlc.CreateSiteParams{ID:"existing123",ServerID:"local",Name:"Existing",Domain:"a.example",State:"active",Metadata:"{}",CreatedAt:"now",UpdatedAt:"now"});
+if e!=nil{t.Fatal(e)};
+data,_:=json.Marshal(agentapi.SiteResources{ID:"site123456",Name:"Duplicate",Domain:"a.example",State:"active"});
+s.finish(ctx,j,agentapi.Operation{State:"succeeded",Phase:"done",Result:data});
+got,e:=s.Q.Job(ctx,j.ID);
+if e!=nil||got.State!="interrupted"||got.ErrorCode!="SYNC_REQUIRED"{t.Fatalf("job stuck or misleading: %+v %v",got,e)}}
+func TestIdempotentRetrySurvivesResourceCreation(t *testing.T){s,j:=fixture(t,"container.start");
+ctx:=context.Background();
+s.finish(ctx,j,agentapi.Operation{State:"failed",Phase:"done"});
+s.Key=make([]byte,32);
+payload,_:=json.Marshal(agentapi.SiteInput{Name:"Example",Domain:"a.example",WordPressTitle:"Example",AdminEmail:"admin@example.com",AdminPassword:"correct password",Resources:agentapi.Resources{MemoryMB:512,CPULimit:1}});
+request:=agentapi.OperationRequest{Kind:"site.install",Payload:payload};
+first,e:=s.Enqueue(ctx,"user123456","key-new-123456",request);
+if e!=nil{t.Fatal(e)};
+if e=s.Q.CreateSite(ctx,sqlc.CreateSiteParams{ID:first.ResourceID,ServerID:"local",Name:"Example",Domain:"a.example",State:"active",Metadata:"{}",CreatedAt:"now",UpdatedAt:"now"});
+e!=nil{t.Fatal(e)};
+second,e:=s.Enqueue(ctx,"user123456","key-new-123456",request);
+if e!=nil||second.ID!=first.ID{t.Fatalf("retry did not recover original job: %v %v",second,e)};
+_,found,e:=s.Existing(ctx,"user123456","key-new-123456",request);
+if e!=nil||!found{t.Fatal("existing lookup should not need an agent")}}
