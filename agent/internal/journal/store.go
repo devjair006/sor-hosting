@@ -49,13 +49,23 @@ func Open(ctx context.Context, dir string, key []byte) (*Store, error) {
 	defer tx.Rollback()
 	var v int
 	e = tx.QueryRowContext(ctx, "PRAGMA user_version").Scan(&v)
-	if e == nil && v > 1 {
+	if e == nil && v > 2 {
 		e = errors.New("unsupported journal version")
 	}
 	if e == nil && v == 0 {
 		_, e = tx.ExecContext(ctx, string(b))
 		if e == nil {
 			_, e = tx.ExecContext(ctx, "PRAGMA user_version=1")
+		}
+	}
+	if e == nil && v < 2 {
+		var audit []byte
+		audit, e = migrations.Files.ReadFile("000002_audit.sql")
+		if e == nil {
+			_, e = tx.ExecContext(ctx, string(audit))
+		}
+		if e == nil {
+			_, e = tx.ExecContext(ctx, "PRAGMA user_version=2")
 		}
 	}
 	if e == nil {
@@ -83,16 +93,32 @@ func (s *Store) Reserve(ctx context.Context, r agentapi.OperationRequest) (agent
 	if e != nil {
 		return agentapi.Operation{}, e
 	}
-	_, e = s.Q.Reserve(ctx, sqlc.ReserveParams{ID: r.ID, Kind: r.Kind, ResourceID: r.ResourceID, Digest: digest, State: "queued", Phase: "Pendiente", Request: encrypted, Result: "{}", ErrorCode: "", UpdatedAt: time.Now().UTC().Format(time.RFC3339)})
+	tx, e := s.DB.BeginTx(ctx, nil)
 	if e != nil {
 		return agentapi.Operation{}, e
 	}
-	v, e := s.Q.Operation(ctx, r.ID)
+	defer tx.Rollback()
+	q := s.Q.WithTx(tx)
+	_, e = q.Reserve(ctx, sqlc.ReserveParams{ID: r.ID, Kind: r.Kind, ResourceID: r.ResourceID, Digest: digest, State: "queued", Phase: "Pendiente", Request: encrypted, Result: "{}", ErrorCode: "", UpdatedAt: time.Now().UTC().Format(time.RFC3339)})
+	if e != nil {
+		return agentapi.Operation{}, e
+	}
+	v, e := q.Operation(ctx, r.ID)
 	if e != nil {
 		return agentapi.Operation{}, e
 	}
 	if v.Digest != digest {
 		return agentapi.Operation{}, fmt.Errorf("idempotency conflict")
+	}
+	actor := r.ActorID
+	if actor == "" {
+		actor = "panel"
+	}
+	if _, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO audit_events(operation_id,action,resource_id,actor_id,outcome,created_at) VALUES(?,?,?,?,?,?)", r.ID, r.Kind, r.ResourceID, actor, "queued", time.Now().UTC().Format(time.RFC3339)); e != nil {
+		return agentapi.Operation{}, e
+	}
+	if e = tx.Commit(); e != nil {
+		return agentapi.Operation{}, e
 	}
 	return public(v), nil
 }
@@ -113,7 +139,20 @@ func (s *Store) Update(ctx context.Context, id, state, phase string, result any,
 	if state == "succeeded" || state == "failed" || state == "interrupted" {
 		request = ""
 	}
-	return s.Q.UpdateOperation(ctx, sqlc.UpdateOperationParams{State: state, Phase: phase, Request: request, Result: string(b), ErrorCode: code, UpdatedAt: time.Now().UTC().Format(time.RFC3339), ID: id})
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	e = s.Q.WithTx(tx).UpdateOperation(ctx, sqlc.UpdateOperationParams{State: state, Phase: phase, Request: request, Result: string(b), ErrorCode: code, UpdatedAt: time.Now().UTC().Format(time.RFC3339), ID: id})
+	if e != nil {
+		return e
+	}
+	_, e = tx.ExecContext(ctx, "INSERT OR IGNORE INTO audit_events(operation_id,action,resource_id,actor_id,outcome,created_at) SELECT ?,?,?,COALESCE((SELECT actor_id FROM audit_events WHERE operation_id=? LIMIT 1),'panel'),?,?", id, v.Kind, v.ResourceID, id, state, time.Now().UTC().Format(time.RFC3339))
+	if e != nil {
+		return e
+	}
+	return tx.Commit()
 }
 func (s *Store) Queued(ctx context.Context) ([]agentapi.OperationRequest, error) {
 	rows, e := s.Q.Pending(ctx)

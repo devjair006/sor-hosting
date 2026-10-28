@@ -11,6 +11,10 @@ export type Job = {
 };
 export type Page<T> = { items: T[]; next_cursor: string | null };
 export type Site = {
+  management?: "managed" | "external";
+  lifecycle?: "present" | "deleting" | "deleted";
+  can_delete?: boolean;
+  can_backup?: boolean;
   availability?: boolean | null;
   id: string;
   name: string;

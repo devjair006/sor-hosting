@@ -3,6 +3,7 @@ package operations
 import (
 	"context"
 	"github.com/moby/moby/client"
+	"sor.hosting/shared/agentapi"
 )
 
 // reconcile observes resources after interruption; it never replays an uncertain mutation.
@@ -43,6 +44,34 @@ func (d *Dispatcher) reconcile(ctx context.Context) error {
 		return e
 	}
 	for _, row := range rows {
+		if row.Kind == "site.external" {
+			site, e := d.Store.Site(ctx, row.ResourceID)
+			if e == nil && site.External() {
+				if e = d.Store.Update(ctx, row.ID, "succeeded", "Registro externo recuperado", site, ""); e != nil {
+					return e
+				}
+				continue
+			}
+		}
+		if row.Kind == "site.delete" {
+			site, e := d.Store.Site(ctx, row.ResourceID)
+			if e == nil {
+				state, phase, code := "failed", "Eliminación no iniciada o revertida", "DELETE_ROLLED_BACK"
+				if site.Lifecycle == "deleted" {
+					state = "succeeded"
+					phase = "Sitio eliminado"
+					code = ""
+				} else if site.Lifecycle == "deleting" {
+					continue
+				} else {
+					site.Lifecycle = "present"
+				}
+				if e = d.Store.Update(ctx, row.ID, state, phase, agentapi.DeleteResult{Site: site, KeepBackups: site.DeleteKeepBackups}, code); e != nil {
+					return e
+				}
+				continue
+			}
+		}
 		var result any = map[string]bool{"reconciled": true}
 		siteID := row.ResourceID
 		if row.Kind == "backup.restore" {

@@ -133,7 +133,7 @@ func (c *Client) CheckLineage(ctx context.Context, id, host string, renew bool) 
 	}
 	return nil
 }
-func (c *Client) ReadCertificate(id, host string) (*agentapi.Certificate, error) {
+func (c *Client) certificate(host string) (*x509.Certificate, error) {
 	host, e := domainname.Normalize(host)
 	if e != nil {
 		return nil, e
@@ -169,10 +169,76 @@ func (c *Client) ReadCertificate(id, host string) (*agentapi.Certificate, error)
 	if e = cert.VerifyHostname(host); e != nil {
 		return nil, e
 	}
+	return cert, nil
+}
+func (c *Client) ReadCertificate(id, host string) (*agentapi.Certificate, error) {
+	host, e := domainname.Normalize(host)
+	if e != nil {
+		return nil, e
+	}
+	cert, e := c.certificate(host)
+	if e != nil {
+		return nil, e
+	}
 	now := time.Now()
 	if cert.NotAfter.Before(now) || cert.NotBefore.After(now) {
 		return nil, errors.New("certificate is not currently valid")
 	}
 	sum := sha256.Sum256(cert.Raw)
-	return &agentapi.Certificate{ID: id, DomainID: id, CertName: name, Hostname: host, ExpiresAt: cert.NotAfter.UTC().Format(time.RFC3339), Fingerprint: hex.EncodeToString(sum[:])}, nil
+	return &agentapi.Certificate{ID: id, DomainID: id, CertName: "sor-" + host, Hostname: host, ExpiresAt: cert.NotAfter.UTC().Format(time.RFC3339), Fingerprint: hex.EncodeToString(sum[:])}, nil
+}
+
+// VerifyDeletion rejects shared SAN certificates and unknown or replaced lineages.
+func (c *Client) VerifyDeletion(ctx context.Context, d agentapi.DomainResult) error {
+	if d.Certificate == nil {
+		return nil
+	}
+	if e := c.CheckLineage(ctx, d.ID, d.Hostname, true); e != nil {
+		return e
+	}
+	cert, e := c.certificate(d.Hostname)
+	if e != nil {
+		return e
+	}
+	sum := sha256.Sum256(cert.Raw)
+	if hex.EncodeToString(sum[:]) != d.Certificate.Fingerprint || d.Certificate.CertName != "sor-"+d.Hostname {
+		return errors.New("certificate identity changed")
+	}
+	if len(cert.DNSNames) != 1 || cert.DNSNames[0] != d.Hostname {
+		return errors.New("shared certificate is protected")
+	}
+	return nil
+}
+func (c *Client) DeleteOwned(ctx context.Context, d agentapi.DomainResult) error {
+	if d.Certificate == nil {
+		return nil
+	}
+	name := "sor-" + d.Hostname
+	if d.Certificate.CertName != name {
+		return errors.New("certificate name mismatch")
+	}
+	missing := true
+	for _, p := range []string{filepath.Join(c.root(), "live", name), filepath.Join(c.root(), "archive", name), filepath.Join(c.root(), "renewal", name+".conf")} {
+		_, e := os.Lstat(p)
+		if e == nil {
+			missing = false
+		} else if !os.IsNotExist(e) {
+			return e
+		}
+	}
+	if missing {
+		return nil
+	}
+	if e := c.VerifyDeletion(ctx, d); e != nil {
+		return e
+	}
+	args, e := executil.CertbotArgs([]string{"delete", "--cert-name", name, "--non-interactive", "--config-dir", c.ExecutionDirectory})
+	if e != nil {
+		return e
+	}
+	runner := c.Runner
+	if runner == nil {
+		runner = executil.Runner{}
+	}
+	return runner.Run(ctx, "certbot", args, nil, nil)
 }

@@ -1,0 +1,1 @@
+CREATE TABLE audit_events(operation_id TEXT NOT NULL, action TEXT NOT NULL, resource_id TEXT NOT NULL, actor_id TEXT NOT NULL, outcome TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(operation_id,outcome));

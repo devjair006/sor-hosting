@@ -39,7 +39,13 @@ jobs:
       - run: npm run test:e2e --prefix frontend
       - run: npm run test:live --prefix frontend
       - run: bash tools/test-docker.sh
+        env:
+          SOR_LIFECYCLE_INTEGRATION: '1'
+          SOR_LIFECYCLE_KEEP_BACKUPS: '0'
       - run: bash tools/test-docker-edge.sh
+        env:
+          SOR_LIFECYCLE_INTEGRATION: '1'
+          SOR_LIFECYCLE_KEEP_BACKUPS: '1'
       - name: Validate Compose
         env:
           SOR_ORIGIN: https://panel.example.com

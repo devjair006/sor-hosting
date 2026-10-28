@@ -24,7 +24,7 @@ func (c *Certbot) Available(ctx context.Context) bool {
 	return e == nil
 }
 func (c *Certbot) Run(ctx context.Context, name string, args []string, in io.Reader, out io.Writer) (err error) {
-	if name != "certbot" || in != nil || len(args) == 0 || (args[0] != "certonly" && args[0] != "renew" && args[0] != "--version") {
+	if name != "certbot" || in != nil || len(args) == 0 || (args[0] != "certonly" && args[0] != "renew" && args[0] != "delete" && args[0] != "--version") {
 		return errors.New("Certbot command not allowed")
 	}
 	args, err = executil.CertbotArgs(args)

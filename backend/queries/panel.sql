@@ -19,7 +19,7 @@ DELETE FROM sessions WHERE user_id=?;
 -- name: PurgeSessions :exec
 DELETE FROM sessions WHERE expires_at<? OR last_seen_at<?;
 -- name: ListSites :many
-SELECT * FROM sites ORDER BY created_at DESC,id DESC;
+SELECT * FROM sites WHERE lifecycle<>'deleted' ORDER BY created_at DESC,id DESC;
 -- name: Site :one
 SELECT * FROM sites WHERE id=?;
 -- name: CreateSite :exec
@@ -69,3 +69,14 @@ UPDATE servers SET name=? WHERE id='local';
 DELETE FROM site_containers WHERE site_id=?;
 -- name: BindContainer :exec
 INSERT INTO site_containers(site_id,container_id,role) VALUES(?,?,?) ON CONFLICT(container_id) DO UPDATE SET site_id=excluded.site_id,role=excluded.role;
+
+-- name: SetSiteManagement :exec
+UPDATE sites SET management=?,lifecycle=? WHERE id=?;
+-- name: CompleteSiteDeletion :exec
+UPDATE sites SET lifecycle='deleted',metadata=?,domain=? ,updated_at=? WHERE id=?;
+-- name: ClearSiteCertificates :exec
+DELETE FROM certificates WHERE domain_id IN (SELECT id FROM domains WHERE site_id=?);
+-- name: ClearSiteDomains :exec
+DELETE FROM domains WHERE site_id=?;
+-- name: ClearSiteBackups :exec
+DELETE FROM backups WHERE site_id=?;

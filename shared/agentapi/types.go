@@ -8,6 +8,7 @@ import (
 )
 
 type Status struct {
+	SiteLifecycle    bool   `json:"site_lifecycle,omitempty"`
 	InstallReady     bool   `json:"install_ready"`
 	Connected        bool   `json:"connected"`
 	Docker           bool   `json:"docker"`
@@ -32,6 +33,7 @@ type Container struct {
 }
 type OperationRequest struct {
 	ID         string          `json:"id"`
+	ActorID    string          `json:"actor_id,omitempty"`
 	Kind       string          `json:"kind"`
 	ServerID   string          `json:"server_id"`
 	ResourceID string          `json:"resource_id"`
@@ -100,22 +102,25 @@ type BackupInput struct {
 	BackupID           string `json:"backup_id"`
 }
 type SiteResources struct {
-	Budget        Resources     `json:"resources"`
-	PrimaryDomain *DomainResult `json:"primary_domain,omitempty"`
-	SafetyBackup  *Backup       `json:"safety_backup,omitempty"`
-	ID            string        `json:"id"`
-	Name          string        `json:"name"`
-	Domain        string        `json:"domain"`
-	WebID         string        `json:"web_id"`
-	DBID          string        `json:"db_id"`
-	Writers       []string      `json:"writers"`
-	Network       string        `json:"network"`
-	WebVolume     string        `json:"web_volume"`
-	DBVolume      string        `json:"db_volume"`
-	Port          uint16        `json:"port"`
-	SecretRef     string        `json:"secret_ref"`
-	State         string        `json:"state"`
-	Adopted       bool          `json:"adopted"`
+	Management        string        `json:"management,omitempty"`
+	Lifecycle         string        `json:"lifecycle,omitempty"`
+	DeleteKeepBackups bool          `json:"delete_keep_backups,omitempty"`
+	Budget            Resources     `json:"resources"`
+	PrimaryDomain     *DomainResult `json:"primary_domain,omitempty"`
+	SafetyBackup      *Backup       `json:"safety_backup,omitempty"`
+	ID                string        `json:"id"`
+	Name              string        `json:"name"`
+	Domain            string        `json:"domain"`
+	WebID             string        `json:"web_id"`
+	DBID              string        `json:"db_id"`
+	Writers           []string      `json:"writers"`
+	Network           string        `json:"network"`
+	WebVolume         string        `json:"web_volume"`
+	DBVolume          string        `json:"db_volume"`
+	Port              uint16        `json:"port"`
+	SecretRef         string        `json:"secret_ref"`
+	State             string        `json:"state"`
+	Adopted           bool          `json:"adopted"`
 }
 type Certificate struct {
 	ID          string `json:"id"`
@@ -140,3 +145,22 @@ type Backup struct {
 	CreatedAt string `json:"created_at"`
 	Version   int    `json:"version"`
 }
+
+type ExternalInput struct {
+	Name                string `json:"name"`
+	Domain              string `json:"domain"`
+	WebContainerID      string `json:"web_container_id"`
+	DatabaseContainerID string `json:"database_container_id"`
+}
+type DeleteInput struct {
+	ConfirmDomain string `json:"confirm_domain"`
+	KeepBackups   bool   `json:"keep_backups"`
+}
+type DeleteResult struct {
+	Site        SiteResources `json:"site"`
+	KeepBackups bool          `json:"keep_backups"`
+}
+
+func (s SiteResources) External() bool { return s.Management == "external" }
+func (s SiteResources) Present() bool  { return s.Lifecycle == "" || s.Lifecycle == "present" }
+func (s SiteResources) Mutable() bool  { return !s.External() && s.Present() }

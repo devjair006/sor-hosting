@@ -60,6 +60,8 @@ func (a *App) Router() http.Handler {
 			r.Get("/sites/{id}", a.site)
 			r.Post("/sites", a.install)
 			r.Post("/sites/adopt", a.adopt)
+			r.Post("/sites/external", a.registerExternal)
+			r.Post("/sites/{id}/delete", a.deleteSite)
 			r.Post("/sites/{id}/backups", a.createBackup)
 			r.Get("/containers", a.containers)
 			r.Get("/containers/{id}/logs", a.logs)
@@ -169,7 +171,7 @@ func (a *App) enqueue(w http.ResponseWriter, r *http.Request, kind, id string, p
 		Hostname string `json:"hostname"`
 	}
 	_ = json.Unmarshal(b, &names)
-	if names.Domain != "" && a.protectedHost(names.Domain) || names.Hostname != "" && a.protectedHost(names.Hostname) {
+	if kind != "site.external" && (names.Domain != "" && a.protectedHost(names.Domain) || names.Hostname != "" && a.protectedHost(names.Hostname)) {
 		httpx.Error(w, r, 403, "PROTECTED_DOMAIN", "El dominio del panel está protegido.")
 		return
 	}
@@ -178,6 +180,10 @@ func (a *App) enqueue(w http.ResponseWriter, r *http.Request, kind, id string, p
 	status, e := a.Agent.Status(ctx)
 	if e != nil || !status.Connected || status.RecoveryRequired {
 		httpx.Error(w, r, 503, "INTEGRATION_UNAVAILABLE", "El agente está desconectado o necesita recuperar una operación.")
+		return
+	}
+	if (kind == "site.delete" || kind == "site.external") && !status.SiteLifecycle {
+		httpx.Error(w, r, 503, "AGENT_UPGRADE_REQUIRED", "Actualiza el agente para gestionar el ciclo de vida de sitios.")
 		return
 	}
 	if kind == "site.install" && (!status.Docker || !status.InstallReady) {

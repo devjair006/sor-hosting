@@ -7,7 +7,7 @@ SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_
 -- name: UpdateOperation :exec
 UPDATE operations SET state=?,phase=?,request=?,result=?,error_code=?,updated_at=? WHERE id=?;
 -- name: InterruptRunning :exec
-UPDATE operations SET state='interrupted',phase=?,request='',error_code='RECOVERY_REQUIRED' WHERE state='running';
+UPDATE operations SET state='interrupted',phase=?,request='',error_code='RECOVERY_REQUIRED' WHERE state='running' AND kind NOT IN ('site.delete','site.external');
 -- name: SaveSite :exec
 INSERT INTO sites(id,metadata) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata;
 -- name: Site :one
@@ -31,4 +31,4 @@ SELECT id,site_id,metadata FROM recovery;
 -- name: DeleteRecovery :exec
 DELETE FROM recovery WHERE id=?;
 -- name: Interrupted :many
-SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at FROM operations WHERE state='interrupted' AND result IN ('null','{}');
+SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at FROM operations WHERE (state='interrupted' AND result IN ('null','{}')) OR (state='running' AND kind IN ('site.delete','site.external'));

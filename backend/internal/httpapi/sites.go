@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"github.com/go-chi/chi/v5"
 	"net/http"
 	"sor.hosting/backend/internal/database/sqlc"
@@ -35,7 +36,16 @@ func (a *App) site(w http.ResponseWriter, r *http.Request) {
 	}
 	containers := []agentapi.Container{}
 	all, _ := a.Agent.Containers(r.Context())
+	var meta agentapi.SiteResources
+	_ = json.Unmarshal([]byte(s.Metadata), &meta)
 	for _, c := range all {
+		if s.Management == "external" && (c.ID == meta.WebID || c.ID == meta.DBID) {
+			c.CanManage = false
+			c.CanReadLogs = false
+			c.Managed = false
+			containers = append(containers, c)
+			continue
+		}
 		if c.SiteID == s.ID {
 			containers = append(containers, c)
 		}

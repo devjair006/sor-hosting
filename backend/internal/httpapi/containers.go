@@ -17,8 +17,8 @@ func (a *App) allowedContainer(r *http.Request, id string, logs bool) (bool, err
 	}
 	for _, c := range all {
 		if c.ID == id && containers.CanUse(c, logs) {
-			_, e = a.Q.Site(r.Context(), c.SiteID)
-			return e == nil, e
+			site, err := a.Q.Site(r.Context(), c.SiteID)
+			return err == nil && site.Management != "external" && site.Lifecycle == "present", err
 		}
 	}
 	return false, nil
