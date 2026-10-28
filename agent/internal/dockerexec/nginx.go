@@ -61,6 +61,9 @@ func (n *Nginx) Run(ctx context.Context, name string, args []string, in io.Reade
 	if name != "nginx" || !allowed || in != nil {
 		return errors.New("Nginx exec not allowed")
 	}
+	if e := ctx.Err(); e != nil {
+		return e
+	}
 	v, e := n.Inspect(ctx)
 	if e != nil {
 		return e
@@ -84,6 +87,9 @@ func (n *Nginx) Run(ctx context.Context, name string, args []string, in io.Reade
 			return ctx.Err()
 		}
 		return errors.New("Nginx exec output failed or exceeded limit")
+	}
+	if e := ctx.Err(); e != nil {
+		return e
 	}
 	for {
 		x, e := n.API.ExecInspect(ctx, ex.ID, client.ExecInspectOptions{})

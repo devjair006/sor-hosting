@@ -3,6 +3,7 @@ package dockerexec
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -76,7 +77,7 @@ func TestDockerNginxAvailabilityAndCancellation(t *testing.T) {
 	f.block = true
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if err := e.Run(ctx, "nginx", []string{"-t"}, nil, io.Discard); err == nil {
-		t.Fatal("cancellation ignored")
+	if err := e.Run(ctx, "nginx", []string{"-t"}, nil, io.Discard); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal("cancellation did not preserve context error", err)
 	}
 }
