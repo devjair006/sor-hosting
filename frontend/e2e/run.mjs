@@ -11,12 +11,27 @@ const id = "a".repeat(48),
 const site = {
   id,
   name: "Sitio de prueba",
+  management: "managed",
+  lifecycle: "present",
+  can_delete: true,
+  can_backup: true,
   domain: "sitio.example",
   state: "active",
   availability: true,
   created_at: now,
   updated_at: now,
 };
+const externalSite = {
+  ...site,
+  id: "e".repeat(48),
+  name: "WordPress compartido",
+  domain: "shared.example",
+  management: "external",
+  can_delete: false,
+  can_backup: false,
+};
+let deleted = false,
+  registered = false;
 const rows = [
   {
     id: cid,
@@ -126,7 +141,7 @@ try {
           services: ["Docker Engine", "Nginx", "Prometheus", "Agente SOR"].map(
             (name) => ({ name, available: true }),
           ),
-          sites: [site],
+          sites: deleted ? [externalSite] : [site, externalSite],
           recent_activity: [],
           observed_at: now,
         });
@@ -144,9 +159,81 @@ try {
           stale: false,
         });
       if (endpoint === "/sites" && request.method() === "GET")
-        return json({ items: [site], next_cursor: null });
+        return json({
+          items: [
+            ...(deleted ? [] : [site]),
+            externalSite,
+            ...(registered
+              ? [
+                  {
+                    ...externalSite,
+                    id: "f".repeat(48),
+                    name: "Sitio externo",
+                    domain: "external.example",
+                  },
+                ]
+              : []),
+          ],
+          next_cursor: null,
+        });
       if (endpoint === "/sites/" + id)
-        return json({ site, containers: [rows[0]], domains: [], backups: [] });
+        return json({
+          site: {
+            ...site,
+            lifecycle: deleted ? "deleted" : "present",
+            can_delete: !deleted,
+          },
+          containers: deleted ? [] : [rows[0]],
+          domains: [],
+          backups: [],
+        });
+      if (endpoint === "/sites/" + externalSite.id)
+        return json({
+          site: externalSite,
+          containers: [],
+          domains: [],
+          backups: [],
+        });
+      if (endpoint === "/sites/external" && request.method() === "POST") {
+        const body = request.postDataJSON();
+        assert.equal(body.domain, "external.example");
+        assert.equal(body.database_secret_ref, undefined);
+        registered = true;
+        return json(
+          {
+            job: {
+              id: "f".repeat(48),
+              kind: "site.external",
+              resource_id: "f".repeat(48),
+              state: "queued",
+              phase: "Pendiente",
+            },
+          },
+          202,
+        );
+      }
+      if (
+        endpoint === "/sites/" + id + "/delete" &&
+        request.method() === "POST"
+      ) {
+        assert.deepEqual(request.postDataJSON(), {
+          confirm_domain: site.domain,
+          keep_backups: true,
+        });
+        deleted = true;
+        return json(
+          {
+            job: {
+              id: "d".repeat(48),
+              kind: "site.delete",
+              resource_id: id,
+              state: "queued",
+              phase: "Pendiente",
+            },
+          },
+          202,
+        );
+      }
       if (endpoint === "/containers")
         return json({ items: rows, next_cursor: null });
       if (
@@ -254,6 +341,66 @@ try {
     await page.goto("https://sor.test/" + route);
     await page.getByRole("heading", { name: title, exact: true }).waitFor();
   }
+  await page.goto("https://sor.test/sites/" + externalSite.id);
+  await page
+    .getByRole("heading", { name: externalSite.name, exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole("button", { name: "Eliminar sitio", exact: true })
+      .count(),
+    0,
+  );
+  assert.equal(
+    await page.getByRole("link", { name: "Crear backup", exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await page
+      .getByRole("link", { name: /Abrir wp-admin/ })
+      .getAttribute("href"),
+    "https://shared.example/wp-admin",
+  );
+  await page.goto("https://sor.test/sites");
+  await page
+    .getByRole("button", { name: "Registrar existente", exact: true })
+    .click();
+  assert.equal(
+    await page.getByLabel("Tipo de registro").inputValue(),
+    "external",
+  );
+  await page
+    .getByLabel("Nombre del sitio", { exact: true })
+    .fill("Sitio externo");
+  await page.getByLabel("Dominio", { exact: true }).fill("external.example");
+  await page
+    .getByRole("button", { name: "Registrar en lectura", exact: true })
+    .click();
+  await page
+    .getByRole("link", { name: "Sitio externo", exact: true })
+    .waitFor();
+  await page.goto("https://sor.test/sites/" + id);
+  await page
+    .getByRole("button", { name: "Eliminar sitio", exact: true })
+    .click();
+  const confirmDelete = page.getByRole("button", {
+    name: "Confirmar eliminación",
+    exact: true,
+  });
+  assert.equal(await confirmDelete.isDisabled(), true);
+  await page
+    .getByLabel("Escribe el dominio completo:", { exact: false })
+    .fill("sitio");
+  assert.equal(await confirmDelete.isDisabled(), true);
+  await page
+    .getByLabel("Escribe el dominio completo:", { exact: false })
+    .fill(site.domain);
+  assert.equal(
+    await page.getByLabel("Conservar backups", { exact: false }).isChecked(),
+    true,
+  );
+  await confirmDelete.click();
+  await page.getByText("Operación completada", { exact: true }).waitFor();
   for (const width of [375, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 1000 });
     await page.goto("https://sor.test/");
@@ -272,7 +419,7 @@ try {
   await page.getByRole("heading", { name: "Accede a tu panel" }).waitFor();
   assert.deepEqual(errors, [], "Errores JavaScript de navegador");
   console.log(
-    "E2E: login/error, navegación, recurso protegido, job, logout y 4 tamaños verificados con API controlada.",
+    "E2E: login/error, navegación, recurso protegido, job, logout y registro externo, confirmación de eliminación, retención y 4 tamaños verificados con API controlada.",
   );
 } finally {
   await browser.close();

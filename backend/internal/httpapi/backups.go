@@ -32,6 +32,9 @@ func (a *App) createBackup(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, e)
 		return
 	}
+	if !a.mutableSite(w, r, id) {
+		return
+	}
 	a.enqueue(w, r, "backup.create", id, agentapi.BackupInput{ConfirmMaintenance: true, SiteID: id})
 }
 
@@ -51,6 +54,9 @@ func (a *App) restore(w http.ResponseWriter, r *http.Request) {
 	s, e := a.Q.Site(r.Context(), b.SiteID)
 	if e != nil {
 		fail(w, r, e)
+		return
+	}
+	if !a.mutableSite(w, r, s.ID) {
 		return
 	}
 	if !in.Confirm || in.Domain != s.Domain {

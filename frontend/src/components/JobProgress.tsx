@@ -6,7 +6,7 @@ export function JobProgress({ id }: { id: string | null }) {
   const q = useJob(id);
   const job = q.data?.job;
   useEffect(() => {
-    if (job?.state === "succeeded")
+    if (job && ["succeeded", "failed", "interrupted"].includes(job.state))
       void queryClient.invalidateQueries({
         predicate: (q) =>
           q.queryKey[0] !== "job" && q.queryKey[0] !== "session",
@@ -19,8 +19,10 @@ export function JobProgress({ id }: { id: string | null }) {
       <Status value={job?.state ?? "queued"} />
       <p>{job?.phase ?? "Registrando operación…"}</p>
       {job?.error_code && (
-        <p className="field-error">
-          La operación necesita revisión. Código: {job.error_code}
+        <p className={job.state === "running" ? "muted" : "field-error"}>
+          {job.state === "running"
+            ? "Recuperación automática en curso. El sitio permanece bloqueado."
+            : "La operación necesita revisión. Código: " + job.error_code}
         </p>
       )}
       <small>

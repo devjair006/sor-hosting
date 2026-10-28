@@ -9,9 +9,10 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sor.hosting/agent/internal/backups"
-	"sor.hosting/agent/internal/certbot"
 	"sor.hosting/agent/internal/config"
+	"sor.hosting/agent/internal/deletion"
 	"sor.hosting/agent/internal/docker"
+	"sor.hosting/agent/internal/edge"
 	"sor.hosting/agent/internal/journal"
 	"sor.hosting/agent/internal/nginx"
 	"sor.hosting/agent/internal/operations"
@@ -48,12 +49,14 @@ func run() error {
 		return e
 	}
 	defer engine.API.Close()
-	proxy := &nginx.Manager{Dir: cfg.NginxDir, Webroot: cfg.ACMEWebroot}
-	certs := &certbot.Client{Webroot: cfg.ACMEWebroot, Email: cfg.CertbotEmail, PublicIPs: cfg.PublicIPs}
+	proxy, certs := edge.New(cfg, engine.API, store)
+	if cfg.Nginx.Mode == "docker" {
+		engine.ProtectedNames = append(engine.ProtectedNames, cfg.Nginx.Container)
+	}
 	wp := &wordpress.Manager{Cfg: cfg, Docker: engine, Store: store, Nginx: proxy, Certbot: certs}
 	engine.Secrets = wp.Secrets
 	backup := &backups.Manager{Cfg: cfg, Store: store, WP: wp}
-	dispatcher := &operations.Dispatcher{Store: store, Docker: engine, WP: wp, Backups: backup}
+	dispatcher := &operations.Dispatcher{Store: store, Docker: engine, WP: wp, Backups: backup, Deletion: &deletion.Manager{WP: wp, Backups: backup}}
 	srv, l, e := rpc.Server(cfg, dispatcher)
 	if e != nil {
 		return e

@@ -2,7 +2,7 @@ name: SOR Hosting CI and delivery
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
   workflow_dispatch:
     inputs:
       deploy:
@@ -39,15 +39,57 @@ jobs:
       - run: npm run test:e2e --prefix frontend
       - run: npm run test:live --prefix frontend
       - run: bash tools/test-docker.sh
+        env:
+          SOR_LIFECYCLE_INTEGRATION: '1'
+          SOR_LIFECYCLE_KEEP_BACKUPS: '0'
+      - run: bash tools/test-docker-edge.sh
+        env:
+          SOR_LIFECYCLE_INTEGRATION: '1'
+          SOR_LIFECYCLE_KEEP_BACKUPS: '1'
       - name: Validate Compose
         env:
           SOR_ORIGIN: https://panel.example.com
           SOR_SECRET_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
         run: docker compose -f deploy/compose.yaml config --quiet
-      - name: Build panel and agent artifact
+      - name: Build panel image
+        run: docker build -f deploy/Dockerfile --target panel -t sor-hosting:verified .
+  agent-artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
+        with:
+          go-version: '1.26.x'
+          cache: false
+      - name: Generate typed queries and test agent
         run: |
-          docker build -f deploy/Dockerfile --target panel -t sor-hosting:verified .
-          docker build -f deploy/Dockerfile --target agent-artifact --output type=local,dest=bin/image-artifact .
+          mkdir -p .tools/bin
+          GOBIN="$PWD/.tools/bin" GOWORK=off go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.29.0
+          .tools/bin/sqlc generate -f agent/sqlc.yaml
+          cd agent
+          go test ./... -count=1
+          go vet ./...
+      - name: Build Linux amd64 agent and checksum
+        env:
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          mkdir -p bin/release
+          cd agent
+          go build -trimpath -ldflags='-s -w' -o ../bin/release/sor-agent-linux-amd64 ./cmd/agent
+          cd ../bin/release
+          sha256sum sor-agent-linux-amd64 > SHA256SUMS
+          printf 'commit=%s\nplatform=linux/amd64\n' "$GITHUB_SHA" > BUILD.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sor-agent-linux-amd64
+          path: bin/release/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
   publish:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: verify

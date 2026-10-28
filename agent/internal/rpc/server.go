@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sor.hosting/agent/internal/config"
 	"sor.hosting/agent/internal/operations"
@@ -23,23 +22,6 @@ func response(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
-}
-func alive() bool {
-	b, e := os.ReadFile("/run/nginx.pid")
-	if e != nil {
-		return false
-	}
-	pid, e := strconv.Atoi(string(trim(b)))
-	if e != nil || pid <= 1 {
-		return false
-	}
-	return syscall.Kill(pid, 0) == nil
-}
-func trim(b []byte) []byte {
-	for len(b) > 0 && (b[len(b)-1] == '\n' || b[len(b)-1] == '\r') {
-		b = b[:len(b)-1]
-	}
-	return b
 }
 func Server(cfg config.Config, d *operations.Dispatcher) (*http.Server, net.Listener, error) {
 	dir := filepath.Dir(cfg.Socket)
@@ -87,10 +69,11 @@ func Server(cfg config.Config, d *operations.Dispatcher) (*http.Server, net.List
 		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
 		defer cancel()
 		_, e := d.Docker.API.Ping(ctx, client.PingOptions{})
-		_, certErr := exec.LookPath("certbot")
+		nginxReady := d.WP.Nginx.Available(ctx)
+		certReady := d.WP.Certbot.Available(ctx)
 		recoveries, recoveryErr := d.Store.Q.Recoveries(ctx)
 		markers, markerErr := filepath.Glob(filepath.Join(cfg.NginxDir, ".sor-*.rollback"))
-		response(w, 200, agentapi.Status{InstallReady: d.WP.TemplateReady(), Connected: true, Docker: e == nil, Nginx: alive(), Certbot: certErr == nil, RecoveryRequired: recoveryErr != nil || len(recoveries) > 0 || markerErr != nil || len(markers) > 0, Version: "0.1.0"})
+		response(w, 200, agentapi.Status{SiteLifecycle: true, InstallReady: d.WP.TemplateReady() && nginxReady, Connected: true, Docker: e == nil, Nginx: nginxReady, Certbot: certReady, RecoveryRequired: recoveryErr != nil || len(recoveries) > 0 || markerErr != nil || len(markers) > 0, Version: "0.3.0"})
 	})
 	mux.HandleFunc("GET /containers", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)

@@ -5,6 +5,8 @@ import "strings"
 func publicFailure(err error) (string, string) {
 	message := err.Error()
 	switch {
+	case strings.Contains(message, "ownership/shared/protected"), strings.Contains(message, "read-only site"):
+		return "SITE_PROTECTED", "El sitio es de solo lectura o no se pudo verificar que todos sus recursos sean propios y exclusivos."
 	case strings.Contains(message, "unmanaged vhost"), strings.Contains(message, "already registered"), strings.Contains(message, "already adopted"), strings.Contains(message, "already associated"):
 		return "RESOURCE_CONFLICT", "El dominio o contenedor ya está asociado. Revisa su configuración antes de reintentar."
 	case strings.Contains(message, "managed Nginx include"):

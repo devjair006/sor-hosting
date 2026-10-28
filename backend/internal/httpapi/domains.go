@@ -31,6 +31,9 @@ func (a *App) addDomain(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, e)
 		return
 	}
+	if !a.mutableSite(w, r, in.SiteID) {
+		return
+	}
 	a.enqueue(w, r, "domain.configure", "", in)
 }
 
@@ -42,6 +45,9 @@ func (a *App) checkDomain(w http.ResponseWriter, r *http.Request) {
 	}
 	var body struct{}
 	if !httpx.Decode(w, r, &body) {
+		return
+	}
+	if !a.mutableSite(w, r, d.SiteID) {
 		return
 	}
 	a.enqueue(w, r, "domain.configure", d.ID, agentapi.DomainInput{SiteID: d.SiteID, Hostname: d.Hostname})
@@ -74,6 +80,9 @@ func (a *App) renewCertificate(w http.ResponseWriter, r *http.Request) {
 	in, e := ssl.Renewal(d.SiteID, d.Hostname, c.CertName)
 	if e != nil {
 		invalid(w, r)
+		return
+	}
+	if !a.mutableSite(w, r, d.SiteID) {
 		return
 	}
 	a.enqueue(w, r, "certificate.renew", d.ID, in)

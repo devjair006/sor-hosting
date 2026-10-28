@@ -5,29 +5,58 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sor.hosting/agent/internal/executil"
 	"sor.hosting/shared/domainname"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
 type Manager struct {
-	Dir, Webroot string
-	Runner       executil.Executor
-	mu           sync.Mutex
+	Dir, Webroot                                    string
+	Runner                                          executil.Executor
+	ContainerDir, ContainerWebroot, CertificatesDir string
+	ProtectedDomains                                []string
+	Health                                          func(context.Context) bool
+	Check                                           func(context.Context) error
+	mu                                              sync.Mutex
 }
 
 func (m *Manager) Apply(ctx context.Context, host string, port uint16, certName string) error {
+	return m.ApplyUpstream(ctx, host, netip.AddrPortFrom(netip.MustParseAddr("127.0.0.1"), port), certName)
+}
+func (m *Manager) ApplyUpstream(ctx context.Context, host string, target netip.AddrPort, certName string) error {
+	if !target.IsValid() || target.Port() == 0 || target.Addr().IsUnspecified() || target.Addr().IsMulticast() {
+		return errors.New("invalid upstream")
+	}
+	return m.apply(ctx, host, target.String(), certName, false)
+}
+func (m *Manager) ApplyDNS(ctx context.Context, host, alias, certName string) error {
+	if !regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,127}$`).MatchString(alias) {
+		return errors.New("invalid upstream alias")
+	}
+	return m.apply(ctx, host, alias+":80", certName, true)
+}
+func (m *Manager) apply(ctx context.Context, host, address, certName string, dns bool) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	host, e := domainname.Normalize(host)
-	if e != nil || port == 0 {
+	if e != nil {
 		return errors.New("invalid virtual host")
+	}
+	for _, protected := range m.ProtectedDomains {
+		if host == protected {
+			return errors.New("protected domain")
+		}
+	}
+	if m.Check != nil {
+		if e = m.Check(ctx); e != nil {
+			return e
+		}
 	}
 	if certName != "" {
 		if certName != "sor-"+host {
@@ -51,11 +80,25 @@ func (m *Manager) Apply(ctx context.Context, host string, port uint16, certName 
 	if oldErr != nil && !os.IsNotExist(oldErr) {
 		return oldErr
 	}
-	upstream := "http://127.0.0.1:" + strconv.Itoa(int(port))
+	if oldErr == nil && !strings.HasPrefix(string(old), "# Managed by SOR Hosting\n") {
+		return errors.New("refusing to replace unmanaged configuration")
+	}
+	upstream := "http://" + address
+	webroot := m.ContainerWebroot
+	if webroot == "" {
+		webroot = m.Webroot
+	}
+	certDir := m.CertificatesDir
+	if certDir == "" {
+		certDir = "/etc/letsencrypt"
+	}
 	location := fmt.Sprintf("location / { proxy_pass %s; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header X-Forwarded-For $remote_addr; proxy_connect_timeout 5s; proxy_read_timeout 60s; }", upstream)
-	conf := fmt.Sprintf("# Managed by SOR Hosting\nserver { listen 80; server_name %s; location ^~ /.well-known/acme-challenge/ { root %q; } %s }\n", host, m.Webroot, location)
+	if dns {
+		location = fmt.Sprintf("resolver 127.0.0.11 valid=10s ipv6=off; set $sor_upstream %q; location / { proxy_pass $sor_upstream; proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme; proxy_set_header X-Forwarded-For $remote_addr; proxy_connect_timeout 5s; proxy_read_timeout 60s; }", upstream)
+	}
+	conf := fmt.Sprintf("# Managed by SOR Hosting\nserver { listen 80; server_name %s; location ^~ /.well-known/acme-challenge/ { root %q; } %s }\n", host, webroot, location)
 	if certName != "" {
-		conf = fmt.Sprintf("# Managed by SOR Hosting\nserver { listen 80; server_name %s; location ^~ /.well-known/acme-challenge/ { root %q; } location / { return 301 https://$host$request_uri; } }\nserver { listen 443 ssl; server_name %s; ssl_certificate /etc/letsencrypt/live/%s/fullchain.pem; ssl_certificate_key /etc/letsencrypt/live/%s/privkey.pem; %s }\n", host, m.Webroot, host, certName, certName, location)
+		conf = fmt.Sprintf("# Managed by SOR Hosting\nserver { listen 80; server_name %s; location ^~ /.well-known/acme-challenge/ { root %q; } location / { return 301 https://$host$request_uri; } }\nserver { listen 443 ssl; server_name %s; ssl_certificate %s/live/%s/fullchain.pem; ssl_certificate_key %s/live/%s/privkey.pem; %s }\n", host, webroot, host, certDir, certName, certDir, certName, location)
 	}
 	f, e := os.CreateTemp(m.Dir, ".sor-*.tmp")
 	if e != nil {
@@ -169,7 +212,11 @@ func (m *Manager) checkInclude(ctx context.Context, host string) error {
 	}
 	dump := out.Buffer.String()
 	included := false
-	want := "include " + m.Dir + "/*.conf;"
+	containerDir := m.ContainerDir
+	if containerDir == "" {
+		containerDir = m.Dir
+	}
+	want := "include " + containerDir + "/*.conf;"
 	for _, line := range strings.Split(dump, "\n") {
 		line = strings.SplitN(line, "#", 2)[0]
 		if strings.Join(strings.Fields(line), " ") == want {
@@ -184,7 +231,7 @@ func (m *Manager) checkInclude(ctx context.Context, host string) error {
 	names := regexp.MustCompile(`(?s)\bserver_name\s+([^;]+);`)
 	for i, match := range matches {
 		filename := dump[match[2]:match[3]]
-		if filepath.Dir(filename) == m.Dir {
+		if filepath.Dir(filename) == containerDir {
 			continue
 		}
 		end := len(dump)

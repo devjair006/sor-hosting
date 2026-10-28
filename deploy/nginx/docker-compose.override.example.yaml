@@ -1,0 +1,23 @@
+# Review against the ORIGINAL Compose config before any manual application.
+# Service key is nginx, not the generated container name.
+services:
+  nginx:
+    volumes:
+      - type: bind
+        source: /etc/nginx/sor-hosting.d
+        target: /etc/nginx/sor-hosting.d
+        read_only: true
+      - type: bind
+        source: /etc/sor-hosting/nginx-managed-include.conf
+        target: /etc/nginx/conf.d/zz-sor-hosting.conf
+        read_only: true
+    networks:
+      default: {}
+      sor-proxy: {}
+networks:
+  sor-proxy:
+    external: true
+    name: sor-proxy
+# Keep ALL original volumes, ports, dependencies and networks.
+# If the stack uses custom networks, preserve those instead of assuming default.
+# Existing certbot/conf and certbot/www mounts must already match agent.json.

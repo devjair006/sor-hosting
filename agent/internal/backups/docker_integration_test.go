@@ -22,6 +22,7 @@ import (
 	"sor.hosting/agent/internal/certbot"
 	"sor.hosting/agent/internal/config"
 	"sor.hosting/agent/internal/docker"
+	"sor.hosting/agent/internal/edge"
 	"sor.hosting/agent/internal/executil"
 	"sor.hosting/agent/internal/journal"
 	"sor.hosting/agent/internal/nginx"
@@ -80,9 +81,17 @@ func TestDockerWordPressBackupRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { dm.API.Close() })
+	var verifyEdge func(*wordpress.Manager, agentapi.SiteResources)
+	if os.Getenv("SOR_EDGE_INTEGRATION") == "1" {
+		verifyEdge = setupDockerEdge(t, &cfg, dm)
+	}
 	wp := &wordpress.Manager{Cfg: cfg, Store: store, Docker: dm,
 		Nginx:   &nginx.Manager{Dir: cfg.NginxDir, Webroot: cfg.ACMEWebroot, Runner: proxyFixture{cfg.NginxDir}},
 		Certbot: &certbot.Client{}, Runner: executil.Runner{}}
+	if verifyEdge != nil {
+		wp.Nginx, wp.Certbot = edge.New(cfg, dm.API, store)
+		wp.Nginx.Runner = &edgeTrace{real: wp.Nginx.Runner, t: t}
+	}
 	dm.Secrets = wp.Secrets
 	if !wp.TemplateReady() {
 		t.Fatal("provide three image@sha256 digests in SOR_TEST_WP_IMAGE, SOR_TEST_DB_IMAGE, SOR_TEST_CLI_IMAGE")
@@ -206,6 +215,12 @@ func TestDockerWordPressBackupRestore(t *testing.T) {
 	rows, err := store.Q.Recoveries(ctx)
 	if err != nil || len(rows) != 0 {
 		t.Fatal("maintenance recovery journal was not cleared")
+	}
+	if verifyEdge != nil {
+		verifyEdge(wp, restored)
+	}
+	if os.Getenv("SOR_LIFECYCLE_INTEGRATION") == "1" {
+		testSiteDeletion(t, wp, restored, bm)
 	}
 	t.Log("real Docker install, authorized actions/logs, file+database backup, safety backup and staged restoration passed")
 }

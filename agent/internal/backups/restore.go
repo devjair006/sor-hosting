@@ -19,7 +19,7 @@ func (m *Manager) rollback(ctx context.Context, r Recovery) error {
 		if d.Certificate != nil {
 			cert = d.Certificate.CertName
 		}
-		if e = m.WP.Nginx.Apply(ctx, d.Hostname, r.Site.Port, cert); e != nil {
+		if e = m.WP.ApplyProxy(ctx, d.Hostname, r.Site, cert); e != nil {
 			return e
 		}
 	}
@@ -35,6 +35,9 @@ func (m *Manager) rollback(ctx context.Context, r Recovery) error {
 	return nil
 }
 func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operationID string) (result agentapi.SiteResources, err error) {
+	if e := m.WP.CheckProxy(ctx); e != nil {
+		return result, e
+	}
 	b, e := m.Store.Backup(ctx, backupID)
 	if e != nil || b.SiteID != siteID {
 		return result, errors.New("backup/site mismatch")
@@ -42,6 +45,9 @@ func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operati
 	original, e := m.Store.Site(ctx, siteID)
 	if e != nil || original.Domain != domain {
 		return result, errors.New("domain confirmation mismatch")
+	}
+	if !original.Mutable() {
+		return result, errors.New("read-only site")
 	}
 	if original.Budget.MemoryMB < 256 || original.Budget.MemoryMB > 16384 || original.Budget.CPULimit < .25 || original.Budget.CPULimit > 16 {
 		return result, errors.New("site resource budget must be declared before restoration")
@@ -193,7 +199,7 @@ func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operati
 		if d.Certificate != nil {
 			cert = d.Certificate.CertName
 		}
-		if e = m.WP.Nginx.Apply(ctx, d.Hostname, stage.Port, cert); e != nil {
+		if e = m.WP.ApplyProxy(ctx, d.Hostname, stage, cert); e != nil {
 			return result, e
 		}
 	}

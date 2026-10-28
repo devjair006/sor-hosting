@@ -39,26 +39,29 @@ func Migrate(ctx context.Context, db *sql.DB) error {
 	if e := db.QueryRowContext(ctx, "SELECT COALESCE(MAX(version),0) FROM schema_migrations").Scan(&v); e != nil {
 		return e
 	}
-	if v > 1 {
+	if v > 2 {
 		return fmt.Errorf("schema incompatible: %d", v)
 	}
-	if v == 1 {
-		return nil
+	for next := v + 1; next <= 2; next++ {
+		name := map[int]string{1: "000001_initial.sql", 2: "000002_site_lifecycle.sql"}[next]
+		b, e := migrations.Files.ReadFile(name)
+		if e != nil {
+			return e
+		}
+		tx, e := db.BeginTx(ctx, nil)
+		if e != nil {
+			return e
+		}
+		if _, e = tx.ExecContext(ctx, string(b)); e == nil {
+			_, e = tx.ExecContext(ctx, "INSERT INTO schema_migrations(version) VALUES(?)", next)
+		}
+		if e != nil {
+			tx.Rollback()
+			return e
+		}
+		if e = tx.Commit(); e != nil {
+			return e
+		}
 	}
-	b, e := migrations.Files.ReadFile("000001_initial.sql")
-	if e != nil {
-		return e
-	}
-	tx, e := db.BeginTx(ctx, nil)
-	if e != nil {
-		return e
-	}
-	defer tx.Rollback()
-	if _, e = tx.ExecContext(ctx, string(b)); e != nil {
-		return e
-	}
-	if _, e = tx.ExecContext(ctx, "INSERT INTO schema_migrations(version) VALUES(1)"); e != nil {
-		return e
-	}
-	return tx.Commit()
+	return nil
 }

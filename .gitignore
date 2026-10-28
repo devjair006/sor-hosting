@@ -1,6 +1,6 @@
-.tools/
+.tools
 .superpowers/
-node_modules/
+node_modules
 dist/
 .env
 .env.*
@@ -19,3 +19,5 @@ bin/
 
 *.tsbuildinfo
 __pycache__/
+
+.worktrees/

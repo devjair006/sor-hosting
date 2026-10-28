@@ -117,8 +117,16 @@ export function BackupsPage() {
                       </Button>
                       <Button
                         variant="ghost"
+                        disabled={
+                          op.busy ||
+                          !sites.data?.items.some(
+                            (s) =>
+                              s.id === b.site_id &&
+                              s.management !== "external" &&
+                              (!s.lifecycle || s.lifecycle === "present"),
+                          )
+                        }
                         size="sm"
-                        disabled={op.busy}
                         onClick={() => {
                           setConfirmation("");
                           setMaintenance(false);
@@ -175,11 +183,17 @@ export function BackupsPage() {
                 defaultValue={params.get("site") ?? ""}
               >
                 <option value="">Selecciona un sitio</option>
-                {sites.data?.items.map((s) => (
-                  <option value={s.id} key={s.id}>
-                    {s.name} · {s.domain}
-                  </option>
-                ))}
+                {sites.data?.items
+                  .filter(
+                    (s) =>
+                      s.management !== "external" &&
+                      (!s.lifecycle || s.lifecycle === "present"),
+                  )
+                  .map((s) => (
+                    <option value={s.id} key={s.id}>
+                      {s.name} · {s.domain}
+                    </option>
+                  ))}
               </select>
             </div>
             <label className="checkbox-label">

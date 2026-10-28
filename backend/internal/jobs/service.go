@@ -112,7 +112,7 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 	if !errors.Is(e, sql.ErrNoRows) {
 		return Job{}, e
 	}
-	if r.Kind == "site.install" || r.Kind == "site.adopt" {
+	if r.Kind == "site.install" || r.Kind == "site.adopt" || r.Kind == "site.external" {
 		var in struct {
 			Domain string `json:"domain"`
 		}
@@ -124,6 +124,15 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 		for _, site := range sites {
 			if site.Domain == in.Domain {
 				return Job{}, ErrConflict
+			}
+			domains, e := q.ListDomains(ctx)
+			if e != nil {
+				return Job{}, e
+			}
+			for _, domain := range domains {
+				if domain.SiteID == site.ID && domain.Hostname == in.Domain {
+					return Job{}, ErrConflict
+				}
 			}
 		}
 	}
@@ -140,6 +149,24 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 			if domain.Hostname == in.Hostname && domain.ID != r.ResourceID {
 				return Job{}, ErrConflict
 			}
+		}
+		sites, e := q.ListSites(ctx)
+		if e != nil {
+			return Job{}, e
+		}
+		for _, site := range sites {
+			if site.ID != in.SiteID && site.Domain == in.Hostname {
+				return Job{}, ErrConflict
+			}
+		}
+	}
+	if r.Kind == "site.delete" {
+		site, e := q.Site(ctx, r.ResourceID)
+		if e != nil {
+			return Job{}, e
+		}
+		if site.Management == "external" || site.Lifecycle != "present" {
+			return Job{}, ErrConflict
 		}
 	}
 	pending, e := q.PendingJobs(ctx)
@@ -162,7 +189,15 @@ func (s *Service) Enqueue(ctx context.Context, actor, key string, r agentapi.Ope
 			return Job{}, ErrBusy
 		}
 	}
+	if r.Kind == "site.delete" {
+		if _, e = tx.ExecContext(ctx, "UPDATE sites SET lifecycle='deleting' WHERE id=?", r.ResourceID); e != nil {
+			return Job{}, e
+		}
+	}
 	r.ID = auth.RandomID()
+	if r.Kind == "site.delete" || r.Kind == "site.external" {
+		r.ActorID = actor
+	}
 	if e = r.Validate(); e != nil {
 		return Job{}, e
 	}
@@ -259,6 +294,16 @@ func (s *Service) finish(ctx context.Context, j sqlc.Job, o agentapi.Operation) 
 			persistResult = true
 		}
 	}
+	if j.Kind == "site.delete" {
+		var resultSite agentapi.DeleteResult
+		if json.Unmarshal(result, &resultSite) == nil && resultSite.Site.ID == j.ResourceID {
+			persistResult = true
+		} else if o.State == "failed" {
+			if _, e = tx.ExecContext(ctx, "UPDATE sites SET lifecycle='present' WHERE id=? AND lifecycle='deleting'", j.ResourceID); e != nil {
+				return
+			}
+		}
+	}
 	if persistResult {
 		if e = s.persist(ctx, q, j.Kind, result, now); e != nil {
 			_ = tx.Rollback()
@@ -280,7 +325,7 @@ func (s *Service) finish(ctx context.Context, j sqlc.Job, o agentapi.Operation) 
 }
 func (s *Service) persist(ctx context.Context, q *sqlc.Queries, kind string, data []byte, now string) error {
 	switch kind {
-	case "site.install", "site.adopt", "backup.restore":
+	case "site.install", "site.adopt", "site.external", "backup.restore":
 		var v agentapi.SiteResources
 		if e := json.Unmarshal(data, &v); e != nil {
 			return e
@@ -297,8 +342,22 @@ func (s *Service) persist(ctx context.Context, q *sqlc.Queries, kind string, dat
 		if e != nil {
 			return e
 		}
+		management := v.Management
+		if management == "" {
+			management = "managed"
+		}
+		lifecycle := v.Lifecycle
+		if lifecycle == "" {
+			lifecycle = "present"
+		}
+		if e = q.SetSiteManagement(ctx, sqlc.SetSiteManagementParams{Management: management, Lifecycle: lifecycle, ID: v.ID}); e != nil {
+			return e
+		}
 		if e = q.DeleteSiteContainers(ctx, v.ID); e != nil {
 			return e
+		}
+		if v.External() {
+			return nil
 		}
 		for role, ids := range map[string][]string{"web": {v.WebID}, "database": {v.DBID}, "writer": v.Writers} {
 			for _, id := range ids {
@@ -323,6 +382,40 @@ func (s *Service) persist(ctx context.Context, q *sqlc.Queries, kind string, dat
 			}
 		}
 		return nil
+	case "site.delete":
+		var v agentapi.DeleteResult
+		if e := json.Unmarshal(data, &v); e != nil {
+			return e
+		}
+		if v.Site.SafetyBackup != nil {
+			raw, _ := json.Marshal(v.Site.SafetyBackup)
+			if e := s.persist(ctx, q, "backup.create", raw, now); e != nil {
+				return e
+			}
+		}
+		if v.Site.Lifecycle != "deleted" {
+			meta, _ := json.Marshal(v.Site)
+			if e := q.UpdateSite(ctx, sqlc.UpdateSiteParams{ID: v.Site.ID, State: v.Site.State, Metadata: string(meta), UpdatedAt: now}); e != nil {
+				return e
+			}
+			return q.SetSiteManagement(ctx, sqlc.SetSiteManagementParams{ID: v.Site.ID, Management: "managed", Lifecycle: v.Site.Lifecycle})
+		}
+		if e := q.ClearSiteCertificates(ctx, v.Site.ID); e != nil {
+			return e
+		}
+		if e := q.ClearSiteDomains(ctx, v.Site.ID); e != nil {
+			return e
+		}
+		if e := q.DeleteSiteContainers(ctx, v.Site.ID); e != nil {
+			return e
+		}
+		if !v.KeepBackups {
+			if e := q.ClearSiteBackups(ctx, v.Site.ID); e != nil {
+				return e
+			}
+		}
+		meta, _ := json.Marshal(v.Site)
+		return q.CompleteSiteDeletion(ctx, sqlc.CompleteSiteDeletionParams{Metadata: string(meta), Domain: "deleted-" + v.Site.ID + ".invalid", UpdatedAt: now, ID: v.Site.ID})
 	case "domain.configure", "certificate.issue", "certificate.renew":
 		var v agentapi.DomainResult
 		if e := json.Unmarshal(data, &v); e != nil {
@@ -372,17 +465,11 @@ func (s *Service) persist(ctx context.Context, q *sqlc.Queries, kind string, dat
 }
 
 func (s *Service) syncFailure(ctx context.Context, j sqlc.Job, result []byte, now string) {
-	tx, e := s.DB.BeginTx(ctx, nil)
-	if e != nil {
-		return
+	state, phase, payload := "interrupted", "El recurso necesita sincronización y revisión", ""
+	if j.Kind == "site.delete" {
+		state = "running"
+		phase = "Sincronizando eliminación con el agente"
+		payload = j.Payload
 	}
-	defer tx.Rollback()
-	q := s.Q.WithTx(tx)
-	e = q.UpdateJob(ctx, sqlc.UpdateJobParams{State: "interrupted", Phase: "El recurso necesita sincronización y revisión", Payload: "", Result: string(result), ErrorCode: "SYNC_REQUIRED", UpdatedAt: now, ID: j.ID})
-	if e == nil {
-		e = q.InsertAudit(ctx, sqlc.InsertAuditParams{ID: auth.RandomID(), UserID: j.UserID, Action: j.Kind, ResourceID: j.ResourceID, Outcome: "interrupted", CreatedAt: now})
-	}
-	if e == nil {
-		_ = tx.Commit()
-	}
+	_ = s.Q.UpdateJob(ctx, sqlc.UpdateJobParams{State: state, Phase: phase, Payload: payload, Result: string(result), ErrorCode: "SYNC_REQUIRED", UpdatedAt: now, ID: j.ID})
 }

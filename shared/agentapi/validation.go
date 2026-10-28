@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+var ContainerID = regexp.MustCompile(`^[0-9a-f]{64}$`)
+
 var OpaqueID = regexp.MustCompile(`^[a-zA-Z0-9_-]{8,80}$`)
 
 func Decode(data []byte, v any) error {
@@ -32,6 +34,10 @@ func (r OperationRequest) Validate() error {
 		v = &ContainerInput{}
 	case "site.install":
 		v = &SiteInput{}
+	case "site.external":
+		v = &ExternalInput{}
+	case "site.delete":
+		v = &DeleteInput{}
 	case "site.adopt":
 		v = &AdoptInput{}
 	case "domain.configure", "certificate.issue", "certificate.renew":

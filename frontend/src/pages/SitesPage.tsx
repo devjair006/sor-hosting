@@ -31,6 +31,9 @@ export function SitesPage() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [open, setOpen] = useState(false);
+  const [registration, setRegistration] = useState<"external" | "adopt">(
+    "external",
+  );
   const q = useQuery({
     queryKey: ["sites", cursor, search, status],
     queryFn: ({ signal }) =>
@@ -91,7 +94,7 @@ export function SitesPage() {
             </select>
             <Button variant="outline" onClick={() => setOpen(true)}>
               <Download size={16} aria-hidden="true" />
-              Importar existente
+              Registrar existente
             </Button>
           </div>
         </CardHeader>
@@ -105,6 +108,7 @@ export function SitesPage() {
               <TableRow>
                 <TableHead>SITIO</TableHead>
                 <TableHead>DOMINIO</TableHead>
+                <TableHead>TIPO</TableHead>
                 <TableHead>ESTADO</TableHead>
                 <TableHead>ACCESO</TableHead>
               </TableRow>
@@ -114,7 +118,7 @@ export function SitesPage() {
                 <TableRow key={s.id}>
                   <TableCell>
                     <Link to={"/sites/" + s.id} className="site-name">
-                      <span className="site-avatar">
+                      <span className="site-avatar" aria-hidden="true">
                         {s.name[0]?.toUpperCase()}
                       </span>
                       <strong>{s.name}</strong>
@@ -130,13 +134,20 @@ export function SitesPage() {
                     </a>
                   </TableCell>
                   <TableCell>
+                    {s.management === "external"
+                      ? "Externo · solo lectura"
+                      : "Administrado por SOR"}
+                  </TableCell>
+                  <TableCell>
                     <Status
                       value={
-                        s.availability === true
-                          ? "online"
-                          : s.availability === false
-                            ? "offline"
-                            : s.state
+                        s.lifecycle === "deleting"
+                          ? "Eliminando"
+                          : s.availability === true
+                            ? "online"
+                            : s.availability === false
+                              ? "offline"
+                              : s.state
                       }
                     />
                   </TableCell>
@@ -175,25 +186,48 @@ export function SitesPage() {
       <OperationFeedback {...op} />
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogTitle>Importar WordPress existente</DialogTitle>
+          <DialogTitle>Registrar WordPress existente</DialogTitle>
           <DialogDescription>
-            El administrador del VPS debe autorizar previamente los IDs exactos
-            y la configuración del sitio en el agente. Esta operación no
-            reinicia los contenedores.
+            Registra un sitio como lectura aunque comparta MariaDB. La adopción
+            completa sigue disponible para instalaciones compatibles autorizadas
+            por el administrador.
           </DialogDescription>
+          <div className="field">
+            <label htmlFor="registration-mode">Tipo de registro</label>
+            <select
+              id="registration-mode"
+              value={registration}
+              onChange={(e) =>
+                setRegistration(e.target.value as "external" | "adopt")
+              }
+            >
+              <option value="external">Externo · solo lectura</option>
+              <option value="adopt">Adopción completa autorizada</option>
+            </select>
+          </div>
           <form
+            key={registration}
             onSubmit={(e) => {
               e.preventDefault();
               const d = new FormData(e.currentTarget);
               void op
-                .run("/sites/adopt", {
-                  name: d.get("name"),
-                  domain: d.get("domain"),
-                  web_container_id: d.get("web"),
-                  database_container_id: d.get("db"),
-                  database_secret_ref: d.get("secret"),
-                  writer_container_ids: [],
-                })
+                .run(
+                  registration === "external"
+                    ? "/sites/external"
+                    : "/sites/adopt",
+                  {
+                    name: d.get("name"),
+                    domain: d.get("domain"),
+                    web_container_id: d.get("web"),
+                    database_container_id: d.get("db"),
+                    ...(registration === "adopt"
+                      ? {
+                          database_secret_ref: d.get("secret"),
+                          writer_container_ids: [],
+                        }
+                      : {}),
+                  },
+                )
                 .then((job) => {
                   if (job) setOpen(false);
                 });
@@ -205,24 +239,32 @@ export function SitesPage() {
               ["web", "ID completo del contenedor WordPress"],
               ["db", "ID completo del contenedor de base de datos"],
               ["secret", "Referencia de secretos autorizada"],
-            ].map(([name, label]) => (
-              <div className="field" key={name}>
-                <label htmlFor={"adopt-" + name}>{label}</label>
-                <Input
-                  id={"adopt-" + name}
-                  name={name}
-                  required
-                  maxLength={253}
-                />
-              </div>
-            ))}
+            ]
+              .filter(([name]) => registration === "adopt" || name !== "secret")
+              .map(([name, label]) => (
+                <div className="field" key={name}>
+                  <label htmlFor={"adopt-" + name}>{label}</label>
+                  <Input
+                    id={"adopt-" + name}
+                    name={name}
+                    required={
+                      registration === "adopt" ||
+                      name === "name" ||
+                      name === "domain"
+                    }
+                    maxLength={253}
+                  />
+                </div>
+              ))}
             {op.error && (
               <p role="alert" className="field-error">
                 {op.error}
               </p>
             )}
             <Button type="submit" disabled={op.busy}>
-              Importar sitio
+              {registration === "external"
+                ? "Registrar en lectura"
+                : "Adoptar sitio"}
             </Button>
           </form>
         </DialogContent>

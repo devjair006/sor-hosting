@@ -19,10 +19,11 @@ import (
 )
 
 type Manager struct {
-	API          *client.Client
-	Store        *journal.Store
-	ProtectedIDs []string
-	Secrets      func(string) []string
+	API            *client.Client
+	Store          *journal.Store
+	ProtectedIDs   []string
+	ProtectedNames []string
+	Secrets        func(string) []string
 }
 
 func New(s *journal.Store, protected []string) (*Manager, error) {
@@ -32,13 +33,23 @@ func New(s *journal.Store, protected []string) (*Manager, error) {
 	}
 	return &Manager{API: c, Store: s, ProtectedIDs: protected}, nil
 }
-func (m *Manager) protected(id, image string, labels map[string]string) bool {
+func (m *Manager) protected(id, image string, labels map[string]string, names ...string) bool {
+	for _, ref := range m.ProtectedNames {
+		if ref == id {
+			return true
+		}
+		for _, name := range names {
+			if strings.TrimPrefix(name, "/") == strings.TrimPrefix(ref, "/") {
+				return true
+			}
+		}
+	}
 	for _, v := range m.ProtectedIDs {
 		if id == v {
 			return true
 		}
 	}
-	return labels["sor.hosting/infra"] == "true" || strings.HasPrefix(image, "nginx") || strings.Contains(image, "/nginx") || strings.Contains(image, "prometheus") || strings.Contains(image, "node-exporter")
+	return labels["sor.hosting/infra"] == "true" || strings.HasPrefix(image, "nginx") || strings.Contains(image, "/nginx") || strings.Contains(image, "prometheus") || strings.Contains(image, "node-exporter") || strings.Contains(image, "node_exporter") || strings.Contains(image, "grafana")
 }
 func (m *Manager) Authorized(ctx context.Context, id string) (agentapi.SiteResources, error) {
 	if !agentapi.OpaqueID.MatchString(id) {
@@ -51,10 +62,13 @@ func (m *Manager) Authorized(ctx context.Context, id string) (agentapi.SiteResou
 	if v.Container.ID != id || v.Container.Config == nil {
 		return agentapi.SiteResources{}, errors.New("exact ID required")
 	}
-	protected := m.protected(id, v.Container.Config.Image, v.Container.Config.Labels)
+	protected := m.protected(id, v.Container.Config.Image, v.Container.Config.Labels, v.Container.Name)
 	sites, e := m.Store.Sites(ctx)
 	if e != nil {
 		return agentapi.SiteResources{}, e
+	}
+	if sharedContainer(sites, id) {
+		return agentapi.SiteResources{}, errors.New("shared container is read-only")
 	}
 	for _, s := range sites {
 		if inventory.Authorized(s, id, protected) {
@@ -78,7 +92,7 @@ func (m *Manager) List(ctx context.Context) ([]agentapi.Container, error) {
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		p := m.protected(c.ID, c.Image, c.Labels)
+		p := m.protected(c.ID, c.Image, c.Labels, c.Names...) || sharedContainer(sites, c.ID)
 		a := agentapi.Container{ID: c.ID, Name: name, Image: c.Image, State: string(c.State), Status: c.Status, Protected: p}
 		for _, s := range sites {
 			if inventory.Authorized(s, c.ID, p) {
@@ -206,6 +220,22 @@ func (m *Manager) Logs(ctx context.Context, id string, tail int) (agentapi.LogsR
 	return agentapi.LogsResult{Lines: strings.Split(strings.TrimSuffix(text, "\n"), "\n"), Truncated: buf.Buffer.Len() >= buf.Max}, nil
 }
 
-func (m *Manager) IsProtected(id, image string, labels map[string]string) bool {
-	return m.protected(id, image, labels)
+func (m *Manager) IsProtected(id, image string, labels map[string]string, names ...string) bool {
+	return m.protected(id, image, labels, names...)
+}
+
+func sharedContainer(sites []agentapi.SiteResources, id string) bool {
+	count := 0
+	for _, s := range sites {
+		if !s.Present() {
+			continue
+		}
+		for _, ref := range append([]string{s.WebID, s.DBID}, s.Writers...) {
+			if id != "" && id == ref {
+				count++
+				break
+			}
+		}
+	}
+	return count > 1
 }

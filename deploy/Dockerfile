@@ -20,7 +20,7 @@ FROM scratch AS agent-artifact
 COPY --from=go-build /out/sor-agent /sor-agent
 
 FROM gcr.io/distroless/static-debian12:nonroot AS panel
-LABEL org.opencontainers.image.title="SOR Hosting" io.sor.schema-max="1"
+LABEL org.opencontainers.image.title="SOR Hosting" io.sor.schema-max="2"
 COPY --from=go-build /out/sor-server /sor-server
 COPY --from=frontend /app/dist /app/frontend
 USER 10001:10001

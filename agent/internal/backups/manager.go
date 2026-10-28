@@ -91,6 +91,9 @@ func (m *Manager) Recover(ctx context.Context) error {
 		if e = json.Unmarshal([]byte(row.Metadata), &r); e != nil {
 			return e
 		}
+		if r.Kind == "site.delete" {
+			continue
+		}
 		if r.Kind == "restore" {
 			if e = m.rollback(ctx, r); e != nil {
 				return e
@@ -121,6 +124,9 @@ func (m *Manager) Create(ctx context.Context, siteID, backupID string) (backup a
 	s, e := m.Store.Site(ctx, siteID)
 	if e != nil {
 		return backup, e
+	}
+	if !s.Mutable() {
+		return backup, errors.New("read-only site")
 	}
 	if s.SecretRef == "" || s.DBID == "" {
 		return backup, errors.New("site missing backup configuration")

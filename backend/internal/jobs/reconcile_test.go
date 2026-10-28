@@ -84,3 +84,65 @@ func TestIdempotentRetrySurvivesResourceCreation(t *testing.T) {
 		t.Fatal("existing lookup should not need an agent")
 	}
 }
+
+func TestDeletedSiteReleasesDomainAndKeepsBackups(t *testing.T) {
+	s, j := fixture(t, "site.delete")
+	ctx := context.Background()
+	if e := s.Q.CreateSite(ctx, sqlc.CreateSiteParams{ID: j.ResourceID, ServerID: "local", Name: "Site", Domain: "reuse.example", State: "active", Metadata: "{}", CreatedAt: "now", UpdatedAt: "now"}); e != nil {
+		t.Fatal(e)
+	}
+	backup := agentapi.Backup{ID: "backup1234", SiteID: j.ResourceID, Checksum: "sum", Version: 1}
+	result, _ := json.Marshal(agentapi.DeleteResult{Site: agentapi.SiteResources{ID: j.ResourceID, Name: "Site", Domain: "reuse.example", State: "active", Lifecycle: "deleted", SafetyBackup: &backup}, KeepBackups: true})
+	s.finish(ctx, j, agentapi.Operation{State: "succeeded", Phase: "deleted", Result: result})
+	got, _ := s.Q.Site(ctx, j.ResourceID)
+	if got.Lifecycle != "deleted" || got.Domain == "reuse.example" {
+		t.Fatal(got)
+	}
+	if _, e := s.Q.Backup(ctx, backup.ID); e != nil {
+		t.Fatal("retained backup missing", e)
+	}
+	if e := s.Q.CreateSite(ctx, sqlc.CreateSiteParams{ID: "replacement01", ServerID: "local", Name: "New", Domain: "reuse.example", State: "active", Metadata: "{}", CreatedAt: "now", UpdatedAt: "now"}); e != nil {
+		t.Fatal("domain is not reusable", e)
+	}
+}
+func TestFailedDeletionRestoresPanelLifecycle(t *testing.T) {
+	s, j := fixture(t, "site.delete")
+	ctx := context.Background()
+	s.Q.CreateSite(ctx, sqlc.CreateSiteParams{ID: j.ResourceID, ServerID: "local", Name: "Site", Domain: "one.example", State: "active", Metadata: "{}", CreatedAt: "now", UpdatedAt: "now"})
+	s.Q.SetSiteManagement(ctx, sqlc.SetSiteManagementParams{ID: j.ResourceID, Management: "managed", Lifecycle: "deleting"})
+	data, _ := json.Marshal(agentapi.DeleteResult{Site: agentapi.SiteResources{ID: j.ResourceID, Domain: "one.example", State: "active", Lifecycle: "present"}})
+	s.finish(ctx, j, agentapi.Operation{State: "failed", Phase: "rollback", Result: data})
+	got, _ := s.Q.Site(ctx, j.ResourceID)
+	if got.Lifecycle != "present" {
+		t.Fatal(got)
+	}
+}
+
+func TestExternalPersistenceNeverGrantsContainerBindings(t *testing.T) {
+	s, _ := fixture(t, "site.external")
+	ctx := context.Background()
+	tx, e := s.DB.BeginTx(ctx, nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer tx.Rollback()
+	for _, id := range []string{"external01", "external02"} {
+		v := agentapi.SiteResources{ID: id, Name: id, Domain: id + ".example", State: "active", Management: "external", Lifecycle: "present", WebID: id, DBID: "shared-mariadb"}
+		raw, _ := json.Marshal(v)
+		if e = s.persist(ctx, s.Q.WithTx(tx), "site.external", raw, "now"); e != nil {
+			t.Fatal(e)
+		}
+	}
+	if e = tx.Commit(); e != nil {
+		t.Fatal(e)
+	}
+	var bindings int
+	s.DB.QueryRowContext(ctx, "SELECT COUNT(*) FROM site_containers").Scan(&bindings)
+	if bindings != 0 {
+		t.Fatal("external reference granted control", bindings)
+	}
+	rows, e := s.Q.ListSites(ctx)
+	if e != nil || len(rows) != 2 || rows[0].Management != "external" || rows[1].Management != "external" {
+		t.Fatal(rows, e)
+	}
+}
