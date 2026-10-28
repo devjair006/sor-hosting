@@ -1,0 +1,5 @@
+[Service]
+# Namespace aliases only. Keep /home hidden to the agent.
+ProtectHome=true
+BindReadOnlyPaths=/home/azureuser/wordpress-server/certbot/conf:/var/lib/sor-hosting/certificates
+BindPaths=/home/azureuser/wordpress-server/certbot/www:/var/lib/sor-hosting/acme

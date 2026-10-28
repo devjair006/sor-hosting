@@ -19,7 +19,7 @@ func (m *Manager) rollback(ctx context.Context, r Recovery) error {
 		if d.Certificate != nil {
 			cert = d.Certificate.CertName
 		}
-		if e = m.WP.Nginx.Apply(ctx, d.Hostname, r.Site.Port, cert); e != nil {
+		if e = m.WP.ApplyProxy(ctx, d.Hostname, r.Site, cert); e != nil {
 			return e
 		}
 	}
@@ -193,7 +193,7 @@ func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operati
 		if d.Certificate != nil {
 			cert = d.Certificate.CertName
 		}
-		if e = m.WP.Nginx.Apply(ctx, d.Hostname, stage.Port, cert); e != nil {
+		if e = m.WP.ApplyProxy(ctx, d.Hostname, stage, cert); e != nil {
 			return result, e
 		}
 	}

@@ -47,3 +47,7 @@ En un host Linux desechable con Nginx, Certbot de staging, Docker y Prometheus:
 8. Recrear contenedor de API y comprobar persistencia. Probar release con imagen no ready y rollback compatible.
 
 Los escenarios de host, SSL, interrupciones y despliegue que aún no cubren las pruebas locales deben quedar registrados antes de habilitar operaciones sobre sitios reales. Los fixtures del navegador se limitan al código de pruebas y nunca se habilitan como modo de producción.
+
+## Extensión Docker edge
+
+`bash tools/test-docker-edge.sh` repite WordPress/backup/restore con Nginx real y Certbot temporal. Comprueba proxy DNS, challenge compartido, estado Docker, mounts, exit codes y rollback de validación/recarga sin cambiar default.conf. Certbot usa `--version` y ACME inalcanzable; no se afirma emisión pública probada. Pruebas unitarias adicionales cubren defaults nativos, aliases RO de systemd, lineages ajenas, certificados fuera de la raíz y cancelación de exec. La guía [Docker edge](docker-edge.md) describe la validación manual restante en Ubuntu.

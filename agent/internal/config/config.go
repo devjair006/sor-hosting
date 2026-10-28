@@ -9,23 +9,26 @@ import (
 )
 
 type Config struct {
-	DockerDataDir  string                            `json:"docker_data_dir"`
-	Socket         string                            `json:"socket"`
-	PeerUID        uint32                            `json:"peer_uid"`
-	PeerGID        uint32                            `json:"peer_gid"`
-	StateDir       string                            `json:"state_dir"`
-	BackupDir      string                            `json:"backup_dir"`
-	NginxDir       string                            `json:"nginx_dir"`
-	ACMEWebroot    string                            `json:"acme_webroot"`
-	CertbotEmail   string                            `json:"certbot_email"`
-	PublicIPs      []string                          `json:"public_ips"`
-	ProtectedIDs   []string                          `json:"protected_ids"`
-	Adoptions      map[string]agentapi.SiteResources `json:"adoptions"`
-	KeyFile        string                            `json:"key_file"`
-	WordPressImage string                            `json:"wordpress_image"`
-	MariaDBImage   string                            `json:"mariadb_image"`
-	CLIImage       string                            `json:"cli_image"`
-	Key            []byte                            `json:"-"`
+	Nginx            NginxConfig                       `json:"nginx"`
+	Certbot          CertbotConfig                     `json:"certbot"`
+	ProtectedDomains []string                          `json:"protected_domains"`
+	DockerDataDir    string                            `json:"docker_data_dir"`
+	Socket           string                            `json:"socket"`
+	PeerUID          uint32                            `json:"peer_uid"`
+	PeerGID          uint32                            `json:"peer_gid"`
+	StateDir         string                            `json:"state_dir"`
+	BackupDir        string                            `json:"backup_dir"`
+	NginxDir         string                            `json:"nginx_dir"`
+	ACMEWebroot      string                            `json:"acme_webroot"`
+	CertbotEmail     string                            `json:"certbot_email"`
+	PublicIPs        []string                          `json:"public_ips"`
+	ProtectedIDs     []string                          `json:"protected_ids"`
+	Adoptions        map[string]agentapi.SiteResources `json:"adoptions"`
+	KeyFile          string                            `json:"key_file"`
+	WordPressImage   string                            `json:"wordpress_image"`
+	MariaDBImage     string                            `json:"mariadb_image"`
+	CLIImage         string                            `json:"cli_image"`
+	Key              []byte                            `json:"-"`
 }
 
 func Load(path string) (Config, error) {
@@ -41,6 +44,9 @@ func Load(path string) (Config, error) {
 		if !filepath.IsAbs(p) {
 			return c, errors.New("agent paths must be absolute")
 		}
+	}
+	if e = c.NormalizeRuntime(); e != nil {
+		return c, e
 	}
 	b, e = os.ReadFile(c.KeyFile)
 	if e != nil {

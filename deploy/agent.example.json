@@ -14,5 +14,13 @@
   "key_file": "/etc/sor-hosting/agent.key",
   "wordpress_image": "",
   "mariadb_image": "",
-  "cli_image": ""
+  "cli_image": "",
+  "nginx": {
+    "mode": "native"
+  },
+  "certbot": {
+    "mode": "native",
+    "directory": "/etc/letsencrypt"
+  },
+  "protected_domains": []
 }

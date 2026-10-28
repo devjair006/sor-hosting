@@ -1,0 +1,40 @@
+{
+  "socket": "/run/sor-hosting/agent.sock",
+  "peer_uid": 10001,
+  "peer_gid": 10001,
+  "state_dir": "/var/lib/sor-hosting",
+  "backup_dir": "/var/lib/sor-hosting/backups",
+  "docker_data_dir": "/var/lib/docker",
+  "nginx_dir": "/etc/nginx/sor-hosting.d",
+  "acme_webroot": "/var/lib/sor-hosting/acme",
+  "certbot_email": "admin@tu-dominio.com",
+  "public_ips": [],
+  "protected_ids": [],
+  "adoptions": {},
+  "key_file": "/etc/sor-hosting/agent.key",
+  "wordpress_image": "",
+  "mariadb_image": "",
+  "cli_image": "",
+  "nginx": {
+    "mode": "docker",
+    "container": "wordpress-server-nginx-1",
+    "include_dir": "/etc/nginx/sor-hosting.d",
+    "webroot": "/var/www/certbot",
+    "certificates_dir": "/etc/letsencrypt",
+    "proxy_network": "sor-proxy"
+  },
+  "certbot": {
+    "mode": "docker",
+    "image": "",
+    "directory": "/var/lib/sor-hosting/certificates",
+    "config_source": "/home/azureuser/wordpress-server/certbot/conf",
+    "webroot_source": "/home/azureuser/wordpress-server/certbot/www"
+  },
+  "protected_domains": [
+    "projectkarli.dev",
+    "www.projectkarli.dev",
+    "pagina1.projectkarli.dev",
+    "pagina2.projectkarli.dev",
+    "sorpanel.projectkarli.dev"
+  ]
+}

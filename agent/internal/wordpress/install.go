@@ -118,6 +118,14 @@ func (m *Manager) Prepare(ctx context.Context, siteID, ref, secretRef string, in
 	webEnv := map[string]string{"WORDPRESS_DB_HOST": "db:3306", "WORDPRESS_DB_NAME": "wordpress", "WORDPRESS_DB_USER": "wordpress", "WORDPRESS_DB_PASSWORD_FILE": "/run/secrets/db_password"}
 	secrets := map[string]any{"db_password": map[string]string{"file": filepath.Join(m.dir(secretRef), "db-password")}, "db_root_password": map[string]string{"file": filepath.Join(m.dir(secretRef), "db-root-password")}, "db_client": map[string]string{"file": filepath.Join(m.dir(secretRef), "db-client.cnf")}}
 	compose := map[string]any{"services": map[string]any{"web": map[string]any{"image": m.Cfg.WordPressImage, "restart": "unless-stopped", "labels": labels, "volumes": mounts, "environment": webEnv, "secrets": []string{"db_password"}, "ports": []any{map[string]any{"target": 80, "published": "0", "host_ip": "127.0.0.1", "protocol": "tcp"}}, "mem_limit": in.Resources.MemoryMB * 1024 * 1024, "cpus": in.Resources.CPULimit, "networks": []string{"site"}}, "db": map[string]any{"image": m.Cfg.MariaDBImage, "restart": "unless-stopped", "labels": labels, "volumes": []string{"db:/var/lib/mysql"}, "environment": map[string]string{"MARIADB_DATABASE": "wordpress", "MARIADB_USER": "wordpress", "MARIADB_PASSWORD_FILE": "/run/secrets/db_password", "MARIADB_ROOT_PASSWORD_FILE": "/run/secrets/db_root_password"}, "secrets": []string{"db_password", "db_root_password", "db_client"}, "networks": []string{"site"}}, "cli": map[string]any{"image": m.Cfg.CLIImage, "profiles": []string{"tools"}, "user": "33:33", "labels": labels, "volumes": mounts, "environment": webEnv, "secrets": []string{"db_password"}, "networks": []string{"site"}}}, "volumes": map[string]any{"wp": map[string]string{"name": s.WebVolume}, "db": map[string]string{"name": s.DBVolume}}, "networks": map[string]any{"site": map[string]string{"name": s.Network}}, "secrets": secrets}
+	if m.Cfg.Nginx.Mode == "docker" {
+		network := m.Cfg.Nginx.ProxyNetwork
+		if network == "" {
+			return s, errors.New("explicit proxy network required")
+		}
+		compose["networks"].(map[string]any)["proxy"] = map[string]any{"name": network, "external": true}
+		compose["services"].(map[string]any)["web"].(map[string]any)["networks"] = map[string]any{"site": map[string]any{}, "proxy": map[string]any{"aliases": []string{"sor-" + ref}}}
+	}
 	b, e := json.MarshalIndent(compose, "", "  ")
 	if e != nil {
 		return s, e
@@ -225,6 +233,9 @@ func (m *Manager) Install(ctx context.Context, r agentapi.OperationRequest, chec
 			return s, errors.New("domain or resource ID already managed")
 		}
 	}
+	if m.Cfg.Nginx.Mode == "docker" && !m.Nginx.Available(ctx) {
+		return s, errors.New("Docker Nginx mounts/network are not ready")
+	}
 	if e = checkpoint("Creando recursos aislados"); e != nil {
 		return s, e
 	}
@@ -327,7 +338,7 @@ func (m *Manager) ConfigureDomain(ctx context.Context, id, siteID, host string, 
 		certName = old.Certificate.CertName
 		d.Certificate = old.Certificate
 	}
-	if e = m.Nginx.Apply(ctx, host, s.Port, certName); e != nil {
+	if e = m.ApplyProxy(ctx, host, s, certName); e != nil {
 		return d, e
 	}
 	if m.Certbot.DNS(ctx, host) {
@@ -335,7 +346,7 @@ func (m *Manager) ConfigureDomain(ctx context.Context, id, siteID, host string, 
 		cert, e := m.Certbot.Issue(ctx, id, host, renew)
 		if e == nil {
 			d.Certificate = cert
-			if e = m.Nginx.Apply(ctx, host, s.Port, cert.CertName); e != nil {
+			if e = m.ApplyProxy(ctx, host, s, cert.CertName); e != nil {
 				return d, e
 			}
 		} else if renew {
@@ -398,7 +409,7 @@ func (m *Manager) Adopt(ctx context.Context, r agentapi.OperationRequest) (agent
 		if e != nil || v.Container.ID != id || v.Container.Config == nil {
 			return agentapi.SiteResources{}, errors.New("container ID mismatch")
 		}
-		if m.Docker.IsProtected(id, v.Container.Config.Image, v.Container.Config.Labels) {
+		if m.Docker.IsProtected(id, v.Container.Config.Image, v.Container.Config.Labels, v.Container.Name) {
 			return agentapi.SiteResources{}, errors.New("protected container")
 		}
 		for _, protected := range m.Cfg.ProtectedIDs {

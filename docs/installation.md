@@ -64,3 +64,7 @@ No se aceptan nombres como autorización ni rutas secretas enviadas por el naveg
 El workflow prueba, construye y publica GHCR desde `main`. El despliegue es manual mediante `workflow_dispatch` con `deploy=true`, en el environment protegido `production`. Configura los secrets `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` y `DEPLOY_PATH`; el host debe poder descargar su imagen privada de GHCR. Elige permisos de publicación mínimos.
 
 El flujo actual actualiza el contenedor del panel. El agente nativo se compila como artefacto del build y se actualiza por el operador durante una ventana sin trabajos activos, manteniendo binario anterior, configuración y journal para recuperación. No se reemplaza un agente en mitad de una restauración.
+
+## Nginx y Certbot en Docker
+
+Para contenedores existentes, sigue [la guía de modo Docker](docker-edge.md). Incluye JSON, montajes explícitos de systemd manteniendo ProtectHome, includes separados, red de proxy y rollback manual. El instalador nativo no migra servicios existentes ni aplica ese override.

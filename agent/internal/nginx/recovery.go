@@ -22,6 +22,11 @@ func (m *Manager) Recover(ctx context.Context) error {
 	if e := PrivatePath(m.Dir); e != nil {
 		return e
 	}
+	if m.Check != nil {
+		if e := m.Check(ctx); e != nil {
+			return e
+		}
+	}
 	paths, e := filepath.Glob(filepath.Join(m.Dir, ".sor-*.rollback"))
 	if e != nil {
 		return e
