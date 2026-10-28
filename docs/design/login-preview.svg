@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="900" viewBox="0 0 1440 900" role="img" aria-labelledby="title desc"><title id="title">SOR Hosting · Propuesta de login</title><desc id="desc">Mockup estático de SOR Hosting. Todos los datos son ilustrativos. Colores sólidos sin degradados.</desc>
+<rect x="0" y="0" width="1440" height="900" rx="0" fill="#F7F8F2"/>
+<rect x="0" y="0" width="565" height="900" rx="0" fill="#15251E"/>
+<rect x="60" y="52" width="38" height="38" rx="8" fill="#08734F"/>
+<path d="M71 63 H88 L80 71 H70 L78 79 H88" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="109" y="70" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="20" font-weight="700" fill="#FFFFFF">SOR</text>
+<text x="109" y="87" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="13" font-weight="400" fill="#B3C0B6">Hosting</text>
+<text x="60" y="278" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="38" font-weight="600" fill="#FFFFFF">EL CONTROL,</text>
+<text x="60" y="330" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="38" font-weight="600" fill="#FFFFFF">BIEN ORGANIZADO.</text>
+<text x="60" y="383" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="19" font-weight="400" fill="#B3C0B6">Tu infraestructura merece claridad.</text>
+<text x="60" y="413" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="17" font-weight="400" fill="#B3C0B6">Administra tus sitios con SOR Hosting.</text>
+<rect x="60" y="497" width="36" height="36" rx="8" fill="#294735"/>
+<path d="M70 515 l6 6 l11 -12" fill="none" stroke="#B9E9CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="112" y="511" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="16" font-weight="500" fill="#FFFFFF">Una vista de todo</text>
+<text x="112" y="535" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="13" font-weight="400" fill="#B3C0B6">Recursos, servicios y sitios en contexto.</text>
+<rect x="60" y="590" width="36" height="36" rx="8" fill="#294735"/>
+<path d="M70 608 l6 6 l11 -12" fill="none" stroke="#B9E9CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="112" y="604" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="16" font-weight="500" fill="#FFFFFF">Operaciones trazables</text>
+<text x="112" y="628" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="13" font-weight="400" fill="#B3C0B6">Cada cambio tiene un estado y un registro.</text>
+<rect x="60" y="683" width="36" height="36" rx="8" fill="#294735"/>
+<path d="M70 701 l6 6 l11 -12" fill="none" stroke="#B9E9CF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="112" y="697" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="16" font-weight="500" fill="#FFFFFF">Tu servidor, tu panel</text>
+<text x="112" y="721" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="13" font-weight="400" fill="#B3C0B6">Una herramienta creada para tu infraestructura.</text>
+<text x="60" y="850" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="10" font-weight="500" fill="#B3C0B6">SOR HOSTING  /  ADMINISTRACIÓN DE INFRAESTRUCTURA</text>
+<rect x="1126" y="35" width="265" height="29" rx="6" fill="#EEF1EA"/>
+<text x="1141" y="54" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="11" font-weight="500" fill="#56645D">MOCKUP · SIN ACCESO AL SERVIDOR</text>
+<text x="723" y="232" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="11" font-weight="600" fill="#08734F">BIENVENIDO A SOR</text>
+<text x="723" y="279" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="32" font-weight="600" fill="#17231E">Accede a tu panel</text>
+<text x="723" y="311" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="14" font-weight="400" fill="#56645D">Inicia sesión con tu cuenta de administrador.</text>
+<text x="723" y="367" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="14" font-weight="500" fill="#17231E">Correo electrónico</text>
+<rect x="723" y="381" width="474" height="49" rx="8" fill="#FFFFFF" stroke="#7B8B80"/>
+<text x="739" y="412" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="14" font-weight="400" fill="#56645D">administrador@tu-dominio.com</text>
+<text x="723" y="471" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="14" font-weight="500" fill="#17231E">Contraseña</text>
+<rect x="723" y="485" width="474" height="49" rx="8" fill="#FFFFFF" stroke="#7B8B80"/>
+<text x="739" y="516" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="18" font-weight="400" fill="#56645D">••••••••••••</text>
+<path d="M1160 509 Q1170 499 1180 509 Q1170 519 1160 509" fill="none" stroke="#56645D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1170" cy="509" r="2.5" fill="none" stroke="#56645D" stroke-width="1.5"/>
+<rect x="723" y="564" width="474" height="49" rx="8" fill="#08734F"/>
+<text x="884" y="595" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="15" font-weight="500" fill="#FFFFFF">Iniciar sesión  →</text>
+<text x="723" y="649" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="12" font-weight="400" fill="#56645D">Acceso exclusivo para administradores.</text>
+<text x="723" y="674" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="12" font-weight="400" fill="#56645D">Tu sesión caduca automáticamente por seguridad.</text>
+<path d="M723 730 L1197 730" fill="none" stroke="#DAE1D8" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="723" y="761" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="12" font-weight="400" fill="#56645D">¿Necesitas recuperar el acceso?</text>
+<text x="723" y="785" font-family="Fira Sans,DejaVu Sans,sans-serif" font-size="12" font-weight="500" fill="#17231E">Contacta al administrador del servidor.</text>
+</svg>
