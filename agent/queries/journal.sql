@@ -1,34 +1,34 @@
 -- name: Reserve :execrows
 INSERT OR IGNORE INTO operations(id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?);
 -- name: Operation :one
-SELECT * FROM operations WHERE id=?;
+SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at FROM operations WHERE id=?;
 -- name: Pending :many
-SELECT * FROM operations WHERE state='queued' ORDER BY updated_at,id;
+SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at FROM operations WHERE state='queued' ORDER BY updated_at,id;
 -- name: UpdateOperation :exec
 UPDATE operations SET state=?,phase=?,request=?,result=?,error_code=?,updated_at=? WHERE id=?;
 -- name: InterruptRunning :exec
-UPDATE operations SET state='interrupted',phase='Revisión requerida tras reinicio',request='',error_code='RECOVERY_REQUIRED' WHERE state='running';
+UPDATE operations SET state='interrupted',phase=?,request='',error_code='RECOVERY_REQUIRED' WHERE state='running';
 -- name: SaveSite :exec
 INSERT INTO sites(id,metadata) VALUES(?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata;
 -- name: Site :one
-SELECT * FROM sites WHERE id=?;
+SELECT id,metadata FROM sites WHERE id=?;
 -- name: Sites :many
-SELECT * FROM sites;
+SELECT id,metadata FROM sites;
 -- name: SaveDomain :exec
 INSERT INTO domains(id,site_id,metadata) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata;
 -- name: Domain :one
-SELECT * FROM domains WHERE id=?;
+SELECT id,site_id,metadata FROM domains WHERE id=?;
 -- name: Domains :many
-SELECT * FROM domains WHERE site_id=?;
+SELECT id,site_id,metadata FROM domains WHERE site_id=?;
 -- name: SaveBackup :exec
 INSERT INTO backups(id,site_id,metadata) VALUES(?,?,?) ON CONFLICT(id) DO NOTHING;
 -- name: Backup :one
-SELECT * FROM backups WHERE id=?;
+SELECT id,site_id,metadata FROM backups WHERE id=?;
 -- name: SaveRecovery :exec
 INSERT INTO recovery(id,site_id,metadata) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET metadata=excluded.metadata;
 -- name: Recoveries :many
-SELECT * FROM recovery;
+SELECT id,site_id,metadata FROM recovery;
 -- name: DeleteRecovery :exec
 DELETE FROM recovery WHERE id=?;
 -- name: Interrupted :many
-SELECT * FROM operations WHERE state='interrupted' AND result IN ('null','{}');
+SELECT id,kind,resource_id,digest,state,phase,request,result,error_code,updated_at FROM operations WHERE state='interrupted' AND result IN ('null','{}');

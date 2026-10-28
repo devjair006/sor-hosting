@@ -4,13 +4,34 @@
 
 `make check` genera sqlc, ejecuta tests Go de los tres módulos, go vet, tests del cliente, typecheck y build de producción. `make fmt` aplica gofmt. `python3 tools/check-schema.py` prueba el esquema y sus restricciones usando SQLite real. `npm run test:e2e --prefix frontend` verifica el build con Playwright y una API controlada, sin necesitar una VPS real.
 
-## Entorno de desarrollo de esta entrega
+## Verificado en desarrollo
 
-Node/npm estaban disponibles. Las dependencias se instalaron offline desde una copia temporal de la caché; no se alteró la caché original. El frontend pasó TypeScript y Vite. Se verificaron nueve casos SQLite (incluida preparación de todas las consultas de ambos módulos) y cuatro casos del cliente HTTP. Las pruebas Go de cookies, expiración, CSRF, cambio de contraseña, políticas y reconciliación están incluidas para ejecutarse con el toolchain.
+Las restricciones iniciales de DNS, Docker y Chromium cambiaron al habilitarse el acceso del entorno. Se descargó Go 1.26.10 desde go.dev y se comprobó el SHA256 oficial antes de extraerlo en `.tools/go`. `make` y el bootstrap detectan ese toolchain local; también admiten Go instalado en el sistema.
 
-Los tests de API del cliente se ejecutan con `node:test` directamente, para obtener el número real de casos incluso en entornos con aislamiento de procesos limitado.
+- `./tools/bootstrap.sh`: sqlc 1.29.0, módulos Go y `npm ci` correctos. Los `go.sum` quedan versionados.
+- `make check build`: generación sqlc, tests Go de los tres módulos, `go vet`, cuatro tests del cliente HTTP, TypeScript, Vite y ambos binarios con `CGO_ENABLED=0` correctos.
+- `python3 tools/check-schema.py`: nueve casos SQLite correctos, incluida preparación de consultas.
+- `npm run test:e2e --prefix frontend`: login, errores, navegación, operaciones, recursos protegidos y logout en 375/768/1024/1440 px, con API controlada.
+- `npm run test:live --prefix frontend`: Chromium frente a la API Go y SQLite reales. Verifica login, cookies HttpOnly/SameSite, CSRF, dashboard sin integraciones, configuración, auditoría, persistencia de datos/sesión tras reiniciar y revocación al salir. Usa datos y credenciales temporales, sin mocks HTTP.
+- Integración Docker real: instalación WordPress/MariaDB, puerto web loopback y DB sin publicar, IDs exactos, protección de contenedores, stop/start/restart, logs, contenido de archivos y DB, backup, modificación y restauración con staging, respaldo de seguridad y conservación del presupuesto. Los proyectos aleatorios se eliminan con sus volúmenes al terminar.
+- Imágenes Docker `panel` y `agent-artifact`: construcción correcta. La imagen del panel arrancó con UID 10001, filesystem de solo lectura y sin capabilities; pasaron readiness, frontend estático, cookie de producción Secure/HttpOnly/SameSite, CSRF, configuración, logout y healthcheck.
+- Compose, sintaxis Bash e instalador dry-run correctos.
 
-Go y sqlc no estaban instalados; DNS de terminal impedía descargarlos. El daemon Docker y los sockets para Vite/Chromium estaban bloqueados. Por ello **no se afirman compilaciones o tests Go, una imagen Docker construida, pruebas E2E de navegador ni integraciones reales exitosas en este entorno**. Los paquetes sqlc y go.sum se generan al resolver dependencias con el bootstrap. CI repite esas comprobaciones con toolchain completo antes de publicar una imagen.
+La prueba Docker usa Nginx simulado sobre archivos temporales y un dominio `.invalid`. No ejecuta Nginx/Certbot del host ni prueba la emisión de certificados. La validación del proxy y sus rollbacks también tiene tests Go con ejecutores controlados.
+
+## Repetir las integraciones
+
+Después de `make build` y con Chromium instalado:
+
+```bash
+BROWSER_EXECUTABLE=/usr/bin/chromium npm run test:e2e --prefix frontend
+BROWSER_EXECUTABLE=/usr/bin/chromium npm run test:live --prefix frontend
+bash tools/test-docker.sh
+```
+
+Omite `BROWSER_EXECUTABLE` para usar Chromium instalado mediante Playwright. El script Docker requiere Engine/Compose y descarga las imágenes oficiales `wordpress:php8.3-apache`, `mariadb:11.4` y `wordpress:cli-php8.3`; resuelve sus digests antes de ejecutar. Puedes fijarlas mediante `SOR_TEST_WP_IMAGE`, `SOR_TEST_DB_IMAGE` y `SOR_TEST_CLI_IMAGE`. Nunca ejecuta una limpieza global de Docker. CI incluye las pruebas de navegador y esta integración antes de publicar.
+
+Los tests del cliente usan `node:test` directamente. Las capturas de navegador se guardan en `frontend/test-results/`, excluido de Git.
 
 ## Prueba previa a producción
 
@@ -25,4 +46,4 @@ En un host Linux desechable con Nginx, Certbot de staging, Docker y Prometheus:
 7. Matar API/agente durante una operación y durante mantenimiento/cutover. Confirmar recuperación y que no se repiten efectos inciertos.
 8. Recrear contenedor de API y comprobar persistencia. Probar release con imagen no ready y rollback compatible.
 
-Estos pasos deben quedar registrados antes de habilitar las operaciones sobre sitios reales. Los fixtures del navegador se limitan al código de pruebas y nunca se habilitan como modo de producción.
+Los escenarios de host, SSL, interrupciones y despliegue que aún no cubren las pruebas locales deben quedar registrados antes de habilitar operaciones sobre sitios reales. Los fixtures del navegador se limitan al código de pruebas y nunca se habilitan como modo de producción.

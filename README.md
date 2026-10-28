@@ -18,7 +18,7 @@ make check
 make build
 ```
 
-`bootstrap.sh` instala sqlc en `.tools/bin`, resuelve los módulos, genera consultas tipadas y prepara npm. No instala paquetes del sistema. El SQL y los manifiestos son la fuente; los paquetes sqlc se generan antes de compilar y no se editan manualmente.
+`bootstrap.sh` instala sqlc en `.tools/bin`, resuelve los módulos, genera consultas tipadas y prepara npm. No instala paquetes del sistema. Si existe `.tools/go/bin/go`, tanto el script como `make` lo usan automáticamente. El SQL y los manifiestos son la fuente; los paquetes sqlc se generan antes de compilar y no se editan manualmente.
 
 Para ejecutar la API local, exporta `SOR_MODE=development`, `SOR_ORIGIN=http://localhost:5173`, `SOR_DATABASE=./data/panel.db`, `SOR_STATIC_DIR=../frontend/dist` y una `SOR_SECRET_KEY` generada con `openssl rand -base64 32`. No reutilices esa clave en producción.
 
@@ -37,7 +37,7 @@ El primer comando solicita la contraseña sin mostrarla. No existe un usuario ni
 Sigue [la instalación](docs/installation.md). La configuración del servidor, dominios, rutas, imágenes por digest y secretos es propia del VPS; no hay valores inventados ni credenciales en el repositorio.
 
 - [Operación y recuperación](docs/operations.md)
-- [Verificación y límites del entorno actual](docs/testing.md)
+- [Pruebas y validación](docs/testing.md)
 - [Decisiones de implementación](docs/implementation-notes.md)
 - [Contrato HTTP](docs/api/openapi.yaml)
 - [Diseño técnico aprobado](docs/superpowers/specs/2026-10-27-sor-hosting-design.md)
@@ -53,7 +53,7 @@ python3 tools/check-schema.py
 ./deploy/install-agent.sh --dry-run
 ```
 
-Pruebas en navegador: `cd frontend && npx playwright install chromium && npm run test:e2e`. Usan el build de producción con respuestas controladas de la API; las integraciones reales se prueban por separado en un host desechable.
+Pruebas en navegador: `cd frontend && npx playwright install chromium && npm run test:e2e`. Usan el build de producción con respuestas controladas de la API; la prueba `npm run test:live --prefix frontend` usa los binarios Go y SQLite reales después de `make build`. `bash tools/test-docker.sh` prueba WordPress, backups y restauración en proyectos Docker desechables sin tocar Nginx/Certbot del host. Consulta [las pruebas](docs/testing.md) para los detalles.
 
 ## Alcance inicial
 

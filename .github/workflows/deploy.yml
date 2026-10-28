@@ -37,6 +37,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - run: npm run test:e2e --prefix frontend
+      - run: npm run test:live --prefix frontend
+      - run: bash tools/test-docker.sh
       - name: Validate Compose
         env:
           SOR_ORIGIN: https://panel.example.com

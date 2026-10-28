@@ -1,4 +1,5 @@
 SHELL := /bin/bash
+export PATH := $(CURDIR)/.tools/go/bin:$(PATH)
 SQLC := $(CURDIR)/.tools/bin/sqlc
 .PHONY: bootstrap generate test check build frontend fmt
 bootstrap:

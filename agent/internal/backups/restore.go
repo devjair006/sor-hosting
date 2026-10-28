@@ -1,119 +1,212 @@
 package backups
-import("context";
-"encoding/json";
-"errors";
-"os";
-"path/filepath";
-"time";
-"sor.hosting/shared/agentapi")
-func(m *Manager)rollback(ctx context.Context,r Recovery)error{domains,e:=m.Store.Domains(ctx,r.Site.ID);
-if e!=nil{return e};
-for _,d:=range domains{cert:="";
-if d.Certificate!=nil{cert=d.Certificate.CertName};
-if e=m.WP.Nginx.Apply(ctx,d.Hostname,r.Site.Port,cert);
-e!=nil{return e}};
-if e=m.Store.SaveSite(ctx,r.Site);
-e!=nil{return e};
-if e=m.resume(ctx,r);
-e!=nil{return e};
-if r.Staging!=nil&&r.Staging.WebID!=""{_ = m.WP.Docker.RawAction(ctx,r.Staging.WebID,"stop")};
-return nil}
-func(m *Manager)Restore(ctx context.Context,backupID,siteID,domain,operationID string)(result agentapi.SiteResources,err error){b,e:=m.Store.Backup(ctx,backupID);
-if e!=nil||b.SiteID!=siteID{return result,errors.New("backup/site mismatch")};
-original,e:=m.Store.Site(ctx,siteID);
-if e!=nil||original.Domain!=domain{return result,errors.New("domain confirmation mismatch")};
-if original.Budget.MemoryMB<256||original.Budget.MemoryMB>16384||original.Budget.CPULimit<.25||original.Budget.CPULimit>16{return result,errors.New("site resource budget must be declared before restoration")};if !m.WP.TemplateReady(){return result,errors.New("pinned template images required before restoration")};if len(original.Writers)>0{return result,errors.New("restore template does not support extra writer containers")};
-archive:=filepath.Join(m.Cfg.BackupDir,b.ID+".tar.gz");
-sum,_,e:=checksum(archive);
-if e!=nil||sum!=b.Checksum{return result,errors.New("backup checksum mismatch")};
-if e=freeSpace(m.Cfg.BackupDir,uint64(b.SizeBytes)*4+256<<20);
-e!=nil{return result,e};
-tmp,e:=os.MkdirTemp(m.Cfg.BackupDir,".restoring-");
-if e!=nil{return result,e};
-defer os.RemoveAll(tmp);
-if e=unpack(archive,tmp);
-e!=nil{return result,e};
-raw,e:=os.ReadFile(filepath.Join(tmp,"manifest.json"));
-if e!=nil{return result,e};
-var manifest Manifest;
-if e=agentapi.Decode(raw,&manifest);
-e!=nil{return result,e};
-if manifest.Version!=1||manifest.Site.ID!=siteID||manifest.Site.Domain!=domain||manifest.MariaDBImage!=m.Cfg.MariaDBImage{return result,errors.New("unsupported backup version or database image")};
-filesHash,filesSize,e:=checksum(filepath.Join(tmp,"files.tar"));
-if e!=nil||filesHash!=manifest.FilesHash{return result,errors.New("files checksum mismatch")};
-dbHash,dbSize,e:=checksum(filepath.Join(tmp,"database.sql"));
-if e!=nil||dbHash!=manifest.DatabaseHash{return result,errors.New("database checksum mismatch")};
-f,e:=os.Open(filepath.Join(tmp,"files.tar"));
-if e!=nil{return result,e};
-e=ValidateTar(f);
-f.Close();
-if e!=nil{return result,e};
-dockerDir:=m.Cfg.DockerDataDir;
-if dockerDir==""{dockerDir="/var/lib/docker"};
-if e=freeSpace(dockerDir,uint64(filesSize+dbSize)+256<<20);
-e!=nil{return result,e};
-domains,e:=m.Store.Domains(ctx,siteID);
-if e!=nil||len(domains)==0{return result,errors.New("site must have managed proxy configuration before restore")};
-safety,e:=m.Create(ctx,siteID,id());
-if e!=nil{return result,errors.New("safety backup failed; original site unchanged")};
-if e=freeSpace(dockerDir,uint64(filesSize+dbSize)+(256<<20));
-e!=nil{return result,e};
-running,e:=m.running(ctx,original);
-if e!=nil{return result,e};
-recovery:=Recovery{Kind:"restore",Site:original,Running:running};
-if e=m.record(ctx,operationID,recovery);
-e!=nil{return result,e};
-finished:=false;
-defer func(){if finished{return};
-recoveryCtx,cancel:=context.WithTimeout(context.Background(),2*time.Minute);
-defer cancel();
-if e:=m.rollback(recoveryCtx,recovery);
-e!=nil{err=errors.New("RECOVERY_REQUIRED");
-return};
-if e:=m.Store.Q.DeleteRecovery(recoveryCtx,operationID);
-e!=nil{err=e}}();
-for _,id:=range running{if e=m.WP.Docker.RawAction(ctx,id,"stop");
-e!=nil{return result,e}};
-in:=agentapi.SiteInput{Name:original.Name,Domain:original.Domain,Resources:original.Budget};
-stage,e:=m.WP.Prepare(ctx,siteID,operationID,original.SecretRef,in);
-recovery.Staging=&stage;
-if x:=m.record(ctx,operationID,recovery);
-x!=nil{return result,x};
-if e!=nil{return result,e};
-f,e=os.Open(filepath.Join(tmp,"files.tar"));
-if e!=nil{return result,e};
-e=m.WP.CopyIn(ctx,stage.WebID,f);
-f.Close();
-if e!=nil{return result,e};
-if e=m.WP.Docker.RawAction(ctx,stage.DBID,"start");
-e!=nil{return result,e};
-if e=m.WP.WaitDatabase(ctx,stage.DBID);
-e!=nil{return result,e};
-f,e=os.Open(filepath.Join(tmp,"database.sql"));
-if e!=nil{return result,e};
-e=m.WP.Import(ctx,stage,f);
-f.Close();
-if e!=nil{return result,e};
-if e=m.WP.Docker.RawAction(ctx,stage.WebID,"start");
-e!=nil{return result,e};
-if e=m.WP.RefreshPort(ctx,&stage);
-e!=nil{return result,e};
-if e=m.WP.WaitWeb(ctx,stage);
-e!=nil{return result,e};
-recovery.Staging=&stage;
-if e=m.record(ctx,operationID,recovery);
-e!=nil{return result,e};
-for _,d:=range domains{cert:="";
-if d.Certificate!=nil{cert=d.Certificate.CertName};
-if e=m.WP.Nginx.Apply(ctx,d.Hostname,stage.Port,cert);
-e!=nil{return result,e}};
-stage.State=original.State;
-stage.PrimaryDomain=original.PrimaryDomain;
-stage.SafetyBackup=&safety;
-stage.Adopted=false;
-if e=m.Store.SaveSite(ctx,stage);
-e!=nil{return result,e};
-if e=m.Store.Q.DeleteRecovery(ctx,operationID);
-e!=nil{return result,e};
-finished=true;
-return stage,nil}
+
+import (
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"sor.hosting/shared/agentapi"
+	"time"
+)
+
+func (m *Manager) rollback(ctx context.Context, r Recovery) error {
+	domains, e := m.Store.Domains(ctx, r.Site.ID)
+	if e != nil {
+		return e
+	}
+	for _, d := range domains {
+		cert := ""
+		if d.Certificate != nil {
+			cert = d.Certificate.CertName
+		}
+		if e = m.WP.Nginx.Apply(ctx, d.Hostname, r.Site.Port, cert); e != nil {
+			return e
+		}
+	}
+	if e = m.Store.SaveSite(ctx, r.Site); e != nil {
+		return e
+	}
+	if e = m.resume(ctx, r); e != nil {
+		return e
+	}
+	if r.Staging != nil && r.Staging.WebID != "" {
+		_ = m.WP.Docker.RawAction(ctx, r.Staging.WebID, "stop")
+	}
+	return nil
+}
+func (m *Manager) Restore(ctx context.Context, backupID, siteID, domain, operationID string) (result agentapi.SiteResources, err error) {
+	b, e := m.Store.Backup(ctx, backupID)
+	if e != nil || b.SiteID != siteID {
+		return result, errors.New("backup/site mismatch")
+	}
+	original, e := m.Store.Site(ctx, siteID)
+	if e != nil || original.Domain != domain {
+		return result, errors.New("domain confirmation mismatch")
+	}
+	if original.Budget.MemoryMB < 256 || original.Budget.MemoryMB > 16384 || original.Budget.CPULimit < .25 || original.Budget.CPULimit > 16 {
+		return result, errors.New("site resource budget must be declared before restoration")
+	}
+	if !m.WP.TemplateReady() {
+		return result, errors.New("pinned template images required before restoration")
+	}
+	if len(original.Writers) > 0 {
+		return result, errors.New("restore template does not support extra writer containers")
+	}
+	archive := filepath.Join(m.Cfg.BackupDir, b.ID+".tar.gz")
+	sum, _, e := checksum(archive)
+	if e != nil || sum != b.Checksum {
+		return result, errors.New("backup checksum mismatch")
+	}
+	if e = freeSpace(m.Cfg.BackupDir, uint64(b.SizeBytes)*4+256<<20); e != nil {
+		return result, e
+	}
+	tmp, e := os.MkdirTemp(m.Cfg.BackupDir, ".restoring-")
+	if e != nil {
+		return result, e
+	}
+	defer os.RemoveAll(tmp)
+	if e = unpack(archive, tmp); e != nil {
+		return result, e
+	}
+	raw, e := os.ReadFile(filepath.Join(tmp, "manifest.json"))
+	if e != nil {
+		return result, e
+	}
+	var manifest Manifest
+	if e = agentapi.Decode(raw, &manifest); e != nil {
+		return result, e
+	}
+	if manifest.Version != 1 || manifest.Site.ID != siteID || manifest.Site.Domain != domain || manifest.MariaDBImage != m.Cfg.MariaDBImage {
+		return result, errors.New("unsupported backup version or database image")
+	}
+	filesHash, filesSize, e := checksum(filepath.Join(tmp, "files.tar"))
+	if e != nil || filesHash != manifest.FilesHash {
+		return result, errors.New("files checksum mismatch")
+	}
+	dbHash, dbSize, e := checksum(filepath.Join(tmp, "database.sql"))
+	if e != nil || dbHash != manifest.DatabaseHash {
+		return result, errors.New("database checksum mismatch")
+	}
+	f, e := os.Open(filepath.Join(tmp, "files.tar"))
+	if e != nil {
+		return result, e
+	}
+	e = ValidateTar(f)
+	f.Close()
+	if e != nil {
+		return result, e
+	}
+	dockerDir := m.Cfg.DockerDataDir
+	if dockerDir == "" {
+		dockerDir = "/var/lib/docker"
+	}
+	if e = freeSpace(dockerDir, uint64(filesSize+dbSize)+256<<20); e != nil {
+		return result, e
+	}
+	domains, e := m.Store.Domains(ctx, siteID)
+	if e != nil || len(domains) == 0 {
+		return result, errors.New("site must have managed proxy configuration before restore")
+	}
+	safety, e := m.Create(ctx, siteID, id())
+	if e != nil {
+		return result, errors.New("safety backup failed; original site unchanged")
+	}
+	if e = freeSpace(dockerDir, uint64(filesSize+dbSize)+(256<<20)); e != nil {
+		return result, e
+	}
+	running, e := m.running(ctx, original)
+	if e != nil {
+		return result, e
+	}
+	recovery := Recovery{Kind: "restore", Site: original, Running: running}
+	if e = m.record(ctx, operationID, recovery); e != nil {
+		return result, e
+	}
+	finished := false
+	defer func() {
+		if finished {
+			return
+		}
+		recoveryCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		if e := m.rollback(recoveryCtx, recovery); e != nil {
+			err = errors.New("RECOVERY_REQUIRED")
+			return
+		}
+		if e := m.Store.Q.DeleteRecovery(recoveryCtx, operationID); e != nil {
+			err = e
+		}
+	}()
+	for _, id := range running {
+		if e = m.WP.Docker.RawAction(ctx, id, "stop"); e != nil {
+			return result, e
+		}
+	}
+	in := agentapi.SiteInput{Name: original.Name, Domain: original.Domain, Resources: original.Budget}
+	stage, e := m.WP.Prepare(ctx, siteID, operationID, original.SecretRef, in)
+	recovery.Staging = &stage
+	if x := m.record(ctx, operationID, recovery); x != nil {
+		return result, x
+	}
+	if e != nil {
+		return result, e
+	}
+	f, e = os.Open(filepath.Join(tmp, "files.tar"))
+	if e != nil {
+		return result, e
+	}
+	e = m.WP.CopyIn(ctx, stage.WebID, f)
+	f.Close()
+	if e != nil {
+		return result, e
+	}
+	if e = m.WP.Docker.RawAction(ctx, stage.DBID, "start"); e != nil {
+		return result, e
+	}
+	if e = m.WP.WaitDatabase(ctx, stage.DBID); e != nil {
+		return result, e
+	}
+	f, e = os.Open(filepath.Join(tmp, "database.sql"))
+	if e != nil {
+		return result, e
+	}
+	e = m.WP.Import(ctx, stage, f)
+	f.Close()
+	if e != nil {
+		return result, e
+	}
+	if e = m.WP.Docker.RawAction(ctx, stage.WebID, "start"); e != nil {
+		return result, e
+	}
+	if e = m.WP.RefreshPort(ctx, &stage); e != nil {
+		return result, e
+	}
+	if e = m.WP.WaitWeb(ctx, stage); e != nil {
+		return result, e
+	}
+	recovery.Staging = &stage
+	if e = m.record(ctx, operationID, recovery); e != nil {
+		return result, e
+	}
+	for _, d := range domains {
+		cert := ""
+		if d.Certificate != nil {
+			cert = d.Certificate.CertName
+		}
+		if e = m.WP.Nginx.Apply(ctx, d.Hostname, stage.Port, cert); e != nil {
+			return result, e
+		}
+	}
+	stage.State = original.State
+	stage.PrimaryDomain = original.PrimaryDomain
+	stage.SafetyBackup = &safety
+	stage.Adopted = false
+	if e = m.Store.SaveSite(ctx, stage); e != nil {
+		return result, e
+	}
+	if e = m.Store.Q.DeleteRecovery(ctx, operationID); e != nil {
+		return result, e
+	}
+	finished = true
+	return stage, nil
+}
